@@ -1,0 +1,51 @@
+# ---------- Vivado (se regenera con hw/scripts/create_project.tcl) ----------
+hw/vivado/
+*.jou
+*.log
+*.str
+*.wdb
+*.backup.*
+.Xil/
+webtalk*
+vivado_pid*
+usage_statistics_webtalk.*
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.gen/
+*.srcs/
+*.xpr
+# El IP empaquetado SÍ se versiona (hw/ip_repo/), salvo sus proyectos de edición:
+hw/ip_repo/**/edit_*
+hw/ip_repo/**/*.xpr
+
+# ---------- Vitis (workspace local; solo se versiona sw/src) ----------
+sw/workspace/
+.metadata/
+.analytics
+RemoteSystemsTempFiles/
+*_system/
+Debug/
+Release/
+*.elf
+*.o
+*.d
+
+# ---------- Tests en el PC ----------
+tests/build/
+sim/out/
+*.exe
+*.ppm
+
+# ---------- Varios ----------
+*.zip
+~$*
+.DS_Store
+Thumbs.db
+.vscode/
+__pycache__/
+# Overleaf: el informe vive en Overleaf; aquí solo se suben los PDF finales
+docs/informe/*.aux
+docs/informe/*.synctex.gz

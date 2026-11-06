@@ -1,0 +1,12 @@
+* text=auto
+*.vhd   text eol=lf
+*.c     text eol=lf
+*.h     text eol=lf
+*.tcl   text eol=lf
+*.xdc   text eol=lf
+*.md    text eol=lf
+*.xsa   binary
+*.bit   binary
+*.bin   binary
+*.pdf   binary
+*.drawio text
