@@ -32,7 +32,7 @@ docs/            plan, diagramas, capturas VIO/ILA, slides del video
 ## Primeros pasos
 
 ```bash
-git clone https://github.com/martinpena03/SepHero.git
+git clone https://github.com/martinpena03/Proyecto_2_SEP.git
 ```
 
 **Vivado** (no clonar en rutas con espacios ni tildes: Vivado falla, por ejemplo, dentro de OneDrive):
