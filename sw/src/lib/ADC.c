@@ -156,7 +156,13 @@ static u16 adc_xfer(u8 next_ch)
 	tx[0] = (u8)(next_ch << 3);                 /* el canal va en los bits 5:3 */
 	tx[1] = (u8)(next_ch << 3);
 	XSpi_Transfer(&SpiInstance1, tx, rx, BUFFER_SIZE_ADC);
+#ifdef ADC_SHIFT1
+	/* Parche temporal para el bitstream con SCK_RATIO = 2: el dato llega corrido un
+	 * bit a la derecha y el bit superior es basura. */
+	return (u16)(((rx[0] + rx[1] * 256) >> 1) & 0x3FFu);
+#else
 	return (u16)((rx[0] + rx[1] * 256) / 4);    /* misma formula del curso */
+#endif
 }
 
 /* Lee un canal (0..7): dos transferencias, como las funciones read_*() del curso. */

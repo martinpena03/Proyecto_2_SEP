@@ -29,8 +29,10 @@ set PROJD $ROOT/hw/vivado/sephero
 set BD    design_1
 set JOBS  6
 
-# Pines candidatos del INT del OPT3001 (pines libres de los Pmod JD, JC y JE).
-set OPT_CAND {U14 U15 V15 W15 T11 T10 U17 T17 Y17}
+# Pines candidatos del INT del OPT3001: los libres de los Pmod JD, JC y JE (bits 0..8)
+# y, por si la tarjeta de extensión también ocupa esos conectores, todos los de JA
+# (bits 9..16) y JB (bits 17..24).
+set OPT_CAND {U14 U15 V15 W15 T11 T10 U17 T17 Y17 N15 L14 K16 K14 N16 L15 J16 J14 V8 W8 U7 V7 Y7 Y6 V6 W6}
 set OPT_W [expr {$MODE eq "finder" ? [llength $OPT_CAND] : 1}]
 
 # ----------------------------------------------------------------------------
@@ -92,13 +94,15 @@ set_property -dict [list \
     CONFIG.C_GPIO2_WIDTH {1} CONFIG.C_ALL_OUTPUTS_2 {1} \
 ] $gpio0
 
-# M02: SPI del ADC de la tarjeta de extensión (16 bits, SCK_RATIO = 2 como el LAB10).
+# M02: SPI del ADC de la tarjeta de extensión (16 bits). El LAB10 usa SCK_RATIO = 2, pero
+# a 25 MHz el dato del ADC llega corrido un bit (medido en la placa: las lecturas salían
+# divididas por 2 y con el bit alto errático). Con 16 el reloj es 3,125 MHz.
 set spi1 [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_quad_spi:3.2 axi_quad_spi_1]
 set_property -dict [list \
     CONFIG.C_USE_STARTUP {0} CONFIG.C_USE_STARTUP_INT {0} \
     CONFIG.C_SPI_MODE {0} CONFIG.Master_mode {1} \
     CONFIG.C_NUM_SS_BITS {1} CONFIG.C_NUM_TRANSFER_BITS {16} \
-    CONFIG.C_SCK_RATIO {2} \
+    CONFIG.C_SCK_RATIO {16} \
 ] $spi1
 
 # M03: I2C del OPT3001 (100 kHz).
