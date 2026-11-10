@@ -69,6 +69,8 @@ extern volatile u32 g_theme_changes;
 int  audio_hw_init(void);                 /* deja el buzzer en silencio                  */
 void audio_set_mute(int mute);            /* 1 = salida deshabilitada (pin quieto)       */
 int  audio_is_muted(void);
+int  audio_user_muted(void);              /* 1 = el usuario silenció con JOY_SEL         */
+void audio_user_mute_task(void);          /* desde main: atiende las pulsaciones de JOY_SEL */
 void audio_get_regs(u32 *interval, u32 *match, u32 *presc, u32 *cnt_ctrl, u32 *clk_hz);
 
 /* ---- lcd_fast.c -------------------------------------------------------------- */

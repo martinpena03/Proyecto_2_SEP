@@ -59,7 +59,7 @@ static void prompt(const UartCfg *u)
         p = fmt_u32(p, u->tmp.deb_ms);
         break;
     case 1:
-        p = fmt_str(p, "BTN_MASK [hex 1-7: bit0 S1, bit1 S2, bit2 SEL] (actual ");
+        p = fmt_str(p, "BTN_MASK [hex 1-7, con bit0: bit0 S1=OK, bit1 S2=atras, bit2 SEL=silencio] (actual ");
         p = fmt_hex(p, u->tmp.btn_mask, 1);
         break;
     case 2:
@@ -113,7 +113,7 @@ static int accept_line(UartCfg *u)
         u->tmp.deb_ms = (u16)v;
         break;
     case 1:
-        if (v < 1u || v > 7u || (v & 0x5u) == 0u) return 0;   /* hace falta S1 o SEL */
+        if (v < 1u || v > 7u || (v & 0x1u) == 0u) return 0;   /* hace falta S1 (OK) */
         u->tmp.btn_mask = (u8)v;
         break;
     case 2:

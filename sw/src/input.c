@@ -133,13 +133,18 @@ void joy_sample(void)
 
 /* ------------------------------ botones (IP) ------------------------------ */
 /* Interrupción del IP propio: lee los flancos ya filtrados y los borra (W1C). */
+/* Pedidos de silencio pendientes (JOY_SEL); los atiende main con audio_user_mute_task(). */
+volatile u8 g_mute_req;
+
 void deb_isr(void *ref)
 {
     GameCtx *ctx = (GameCtx *)ref;
     u8 e = debouncer_get_edges(&ctx->deb);
     if (e & 0x1u) ui_push(UI_OK);        /* S1      */
     if (e & 0x2u) ui_push(UI_BACK);      /* S2      */
-    if (e & 0x4u) ui_push(UI_OK);        /* JOY_SEL */
+    /* JOY_SEL: una pulsación breve alterna la música (silencio con enclavamiento, no
+     * "mientras esté presionado"). El EDGE del IP marca solo el flanco de presión. */
+    if (e & 0x4u) g_mute_req++;
 }
 
 /* --------------------------- OPT_INT (axi_gpio_1) ------------------------- */

@@ -109,6 +109,7 @@ int main(void)
     while (1) {
         theme_task();                            /* I2C del OPT3001, si hubo OPT_INT */
         motion_task();                           /* aviso del acelerómetro (AO2)     */
+        audio_user_mute_task();                  /* JOY_SEL: música ON / OFF         */
 #ifdef SEP_DIAG
         diag_poll(&ctx);
 #endif

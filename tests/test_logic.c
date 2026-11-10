@@ -234,7 +234,9 @@ void test_debcfg(void)
     CHECK(debcfg_validate(NULL) == -1);
     c.deb_ms = 0;      CHECK(debcfg_validate(&c) == -2);   c.deb_ms = 255;
     c.btn_mask = 0;    CHECK(debcfg_validate(&c) == -3);
-    c.btn_mask = 2;    CHECK(debcfg_validate(&c) == -4);   c.btn_mask = 4;
+    c.btn_mask = 2;    CHECK(debcfg_validate(&c) == -4);
+    c.btn_mask = 4;    CHECK(debcfg_validate(&c) == -4);   /* JOY_SEL ya no es OK */
+    c.btn_mask = 5;
     CHECK(debcfg_validate(&c) == 0);
     c.joy_umbral = 99; CHECK(debcfg_validate(&c) == -5);   c.joy_umbral = 450;
     c.umbral_shake = 2001; CHECK(debcfg_validate(&c) == -6);  c.umbral_shake = 800;
