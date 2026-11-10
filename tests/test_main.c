@@ -1,20 +1,29 @@
 /*
- * test_main.c - Punto de entrada de los tests en el PC.
- * B agrega aquí (o en otros test_*.c) los casos de game_engine y game_fsm.
+ * test_main.c - Punto de entrada de los tests en el PC (make -C tests run).
+ * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio.
+ * Devuelve != 0 si alguna comprobación falla.
  */
-#include <stdio.h>
-#include "game_types.h"
+#include "test.h"
 
-static int fails = 0;
-#define CHECK(cond) do { if (!(cond)) { printf("FALLA %s:%d  %s\n", \
-                         __FILE__, __LINE__, #cond); fails++; } } while (0)
+int g_fails = 0;
+int g_checks = 0;
 
 int main(void)
 {
-    CHECK(N_LANES == 4);
-    CHECK(sizeof(Note) >= 9);
-    /* TODO(B): tests de game_judge_hit, star power, rock meter y FSM. */
-
-    printf(fails ? "%d test(s) fallaron\n" : "OK\n", fails);
-    return fails != 0;
+    static const struct { const char *name; void (*fn)(void); } T[] = {
+        { "game_engine", test_engine },   { "joy_logic", test_joy },
+        { "sd_formats", test_formats },   { "audio_seq", test_audio_seq },
+        { "debcfg", test_debcfg },        { "uart_config", test_uart_cfg },
+        { "game_fsm", test_fsm },         { "render", test_render },
+    };
+    unsigned i;
+    for (i = 0; i < sizeof T / sizeof T[0]; i++) {
+        int before = g_fails;
+        stub_reset();
+        T[i].fn();
+        printf("%-12s %s\n", T[i].name, (g_fails == before) ? "ok" : "FALLA");
+    }
+    printf("%d comprobaciones, %d fallas\n", g_checks, g_fails);
+    printf(g_fails ? "TESTS_FAIL\n" : "TESTS_OK\n");
+    return g_fails != 0;
 }

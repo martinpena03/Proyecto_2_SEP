@@ -38,6 +38,7 @@ typedef struct {
 int  debouncer_init(Debouncer *dev, const DebCfg *cfg);
 u8   debouncer_get_edges(Debouncer *dev);          /* lee EDGE y lo borra (W1C) */
 u8   debouncer_get_state(const Debouncer *dev);    /* nivel filtrado            */
+void debouncer_readback(const Debouncer *dev, u16 *deb_ms, u8 *btn_mask);  /* relee el IP */
 
 /* debouncer_logic.c (portable): validación y valores por defecto. */
 #define DEB_MS_MIN        1u
@@ -61,6 +62,7 @@ void uart_hal_puts(const char *s);
 typedef struct {
     u8     step;       /* 0..3: DEB_MS, BTN_MASK, JOY_UMBRAL, UMBRAL_SHAKE */
     u8     len;        /* caracteres acumulados en line[]                  */
+    u8     last_eol;   /* último fin de línea visto ('\r' o '\n'; 0 = otro) */
     char   line[24];
     DebCfg tmp;        /* configuración en construcción                    */
 } UartCfg;
@@ -122,6 +124,7 @@ typedef struct {
     u16 n, idx;
     u8  vol;                /* 0..100 % (duty)                                    */
     volatile u8 playing;    /* 1 = secuenciando                                   */
+    volatile u8 paused;     /* 1 = pista principal en silencio (estado PAUSA)     */
     u8  loop;               /* jingles en loop (menú)                             */
     u8  song_clock;         /* 1 = usa song_ms (se pausa con la canción)          */
     u32 t_ms;               /* reloj propio del jingle (lo avanza buzzer_tick)    */
@@ -138,6 +141,7 @@ void buzzer_play(Buzzer_t *bz, const Song *song);                    /* canción
 void buzzer_play_jingle(Buzzer_t *bz, const Note *notes, u16 n, u8 loop);
 void buzzer_play_sfx(Buzzer_t *bz, const Note *notes, u16 n);
 void buzzer_tick(Buzzer_t *bz, u32 song_ms);                         /* cada 1 ms (ISR) */
+void buzzer_pause(Buzzer_t *bz, int on);
 void buzzer_stop(Buzzer_t *bz);
 
 /* Jingles y efectos (audio_seq.c). */
