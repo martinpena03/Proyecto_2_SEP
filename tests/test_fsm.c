@@ -60,12 +60,13 @@ void test_fsm(void)
     frame(UI_OK);    CHECK(ctx.st == ST_CONFIG && !ctx.bz.playing);
     frame(UI_BACK);  CHECK(ctx.st == ST_MENU && stub_deb_inits == 0);
     frame(UI_UP);    frame(UI_OK);  CHECK(ctx.st == ST_CONFIG);
-    stub_uart_feed("15\r\n5\r\n220\r\n900\r\n");
+    stub_uart_feed("15\r\n5\r\n220\r\n900\r\n6\r\n");
     frame(UI_NONE);
     CHECK(ctx.st == ST_MENU && stub_deb_inits == 1);
     CHECK(stub_deb_cfg.deb_ms == 15 && stub_deb_cfg.btn_mask == 5);     /* llegó al IP */
     CHECK(stub_joy_umbral == 220 && stub_shake_mg == 900 && ctx.cfg.deb_ms == 15);
-    CHECK(strstr(stub_uart_out, "IP: DEB_MS=15 BTN_MASK=0x5 (releidos del hardware)") != NULL);
+    CHECK(strstr(stub_uart_out, "IP: DEB_MS=15 BTN_MASK=0x5 LED_CTRL=0x06 (releidos del hardware)") != NULL);
+    CHECK(strstr(stub_uart_out, "ESTADO: MENU") != NULL);
 
     /* RECORDS y vuelta. */
     frame(UI_DOWN);  frame(UI_OK);   CHECK(ctx.st == ST_RECORDS);

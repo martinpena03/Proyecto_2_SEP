@@ -26,11 +26,13 @@ typedef struct {
     u8  btn_mask;      /* bit0 S1, bit1 S2, bit2 JOY_SEL        -> IP (reg BTN_MASK) */
     u16 joy_umbral;    /* umbral de dirección del joystick      -> input.c           */
     u16 umbral_shake;  /* umbral del acelerómetro [mg]          -> sensors.c         */
+    u8  led_pattern;   /* LEDs LD3..LD0 en modo claro [1-F]     -> IP (reg LED_CTRL) */
 } DebCfg;
 
 typedef struct {
     uintptr_t base;    /* dirección base AXI (XPAR_..._BASEADDR) */
     DebCfg    cfg;     /* última configuración aplicada          */
+    u8        light;   /* 1 = modo claro habilitado (LEDs encendidos) */
 } Debouncer;
 
 /* debouncer_axi.c (no portable): inicializa y configura el hardware por punteros.
@@ -39,6 +41,8 @@ int  debouncer_init(Debouncer *dev, const DebCfg *cfg);
 u8   debouncer_get_edges(Debouncer *dev);          /* lee EDGE y lo borra (W1C) */
 u8   debouncer_get_state(const Debouncer *dev);    /* nivel filtrado            */
 void debouncer_readback(const Debouncer *dev, u16 *deb_ms, u8 *btn_mask);  /* relee el IP */
+void debouncer_set_theme(Debouncer *dev, int light);   /* LED_CTRL.THEME_LIGHT (modo claro) */
+u8   debouncer_led_readback(const Debouncer *dev);     /* LED_CTRL releído: [4] tema, [3:0] patrón */
 
 /* debouncer_logic.c (portable): validación y valores por defecto. */
 #define DEB_MS_MIN        1u
@@ -47,8 +51,10 @@ void debouncer_readback(const Debouncer *dev, u16 *deb_ms, u8 *btn_mask);  /* re
 #define JOY_UMBRAL_MAX    450u
 #define SHAKE_MG_MIN      200u
 #define SHAKE_MG_MAX      2000u
+#define LED_PAT_MIN       1u
+#define LED_PAT_MAX       0xFu
 int  debcfg_validate(const DebCfg *c);             /* 0 = válida */
-void debcfg_default(DebCfg *c);                    /* 20 ms, 0x7, 250, 800 mg */
+void debcfg_default(DebCfg *c);                    /* 20 ms, 0x7, 250, 800 mg, 0xF */
 
 /* ====================================================================== */
 /* UART (AO3: configuración desde la consola del PC)                      */
@@ -60,7 +66,7 @@ void uart_hal_puts(const char *s);
 
 /* uart_config.c (portable): lector de línea no bloqueante + parser. */
 typedef struct {
-    u8     step;       /* 0..3: DEB_MS, BTN_MASK, JOY_UMBRAL, UMBRAL_SHAKE */
+    u8     step;       /* 0..4: DEB_MS, BTN_MASK, JOY_UMBRAL, UMBRAL_SHAKE, LED_PATTERN */
     u8     len;        /* caracteres acumulados en line[]                  */
     u8     last_eol;   /* último fin de línea visto ('\r' o '\n'; 0 = otro) */
     char   line[24];

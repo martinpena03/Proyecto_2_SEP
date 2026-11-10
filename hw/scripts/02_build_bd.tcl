@@ -27,13 +27,17 @@ if {$MODE ne "final" && $MODE ne "finder"} { error "modo desconocido: $MODE (fin
 set ROOT  [file normalize [file join [file dirname [info script]] .. ..]]
 set PROJD $ROOT/hw/vivado/sephero
 set BD    design_1
-set JOBS  6
+set JOBS  2   ;# nunca mas de 2: con mas nucleos el PC se cae
+# Vivado 2020.1 se cae (TclStackFree: incorrect freePtr) con muchas sintesis OOC multihilo.
+set_param general.maxThreads 1
 
 # Pines candidatos del INT del OPT3001: los libres de los Pmod JD, JC y JE (bits 0..8)
-# y, por si la tarjeta de extensión también ocupa esos conectores, todos los de JA
-# (bits 9..16) y JB (bits 17..24).
-set OPT_CAND {U14 U15 V15 W15 T11 T10 U17 T17 Y17 N15 L14 K16 K14 N16 L15 J16 J14 V8 W8 U7 V7 Y7 Y6 V6 W6}
-set OPT_W [expr {$MODE eq "finder" ? [llength $OPT_CAND] : 1}]
+# y todos los de JA (bits 9..16). JB no existe en la Zybo Z7-10 (banco 13 sin bonding:
+# el build de 25 pines falló en place_design). Ambos modos usan los 17 candidatos: el
+# firmware detecta en el arranque qué bit sigue al INT (cambiando POL del OPT3001) y, si
+# ninguno, pasa a un respaldo por timer. Así no hace falta otro bitstream al encontrarlo.
+set OPT_CAND {U14 U15 V15 W15 T11 T10 U17 T17 Y17 N15 L14 K16 K14 N16 L15 J16 J14}
+set OPT_W [llength $OPT_CAND]
 
 # ----------------------------------------------------------------------------
 # Proyecto
@@ -234,6 +238,10 @@ connect_bd_net [get_bd_ports BUZZER_PWM] [get_bd_pins processing_system7_0/TTC0_
 create_bd_port -dir I -from 2 -to 0 btn_in
 connect_bd_net [get_bd_ports btn_in] [get_bd_pins debouncer_axi_0/btn_in] [get_bd_pins ila_0/probe0]
 
+# LEDs LD0..LD3 de la Zybo <- IP propio (indicador del modo claro).
+create_bd_port -dir O -from 3 -to 0 leds
+connect_bd_net [get_bd_ports leds] [get_bd_pins debouncer_axi_0/leds]
+
 # INT del OPT3001 -> axi_gpio_1.
 create_bd_port -dir I -from [expr {$OPT_W - 1}] -to 0 opt_int
 connect_bd_net [get_bd_ports opt_int] [get_bd_pins axi_gpio_1/gpio_io_i]
@@ -277,18 +285,8 @@ set_property top ${BD}_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
 add_files -fileset constrs_1 -norecurse $ROOT/hw/constraints/sephero.xdc
-if {$MODE eq "finder"} {
-    # Restricciones provisionales: los 9 candidatos como entradas con pull-up.
-    set fx $ROOT/hw/vivado/opt_finder.xdc
-    set fh [open $fx w]
-    set i 0
-    foreach pin $OPT_CAND {
-        puts $fh "set_property -dict { PACKAGE_PIN $pin IOSTANDARD LVCMOS33 PULLUP true } \[get_ports { opt_int\[$i\] }\]"
-        incr i
-    }
-    close $fh
-    add_files -fileset constrs_1 -norecurse $fx
-}
+# Candidatos del INT del OPT3001 (archivo fijo: generarlo en el build dejó un .xdc vacío).
+add_files -fileset constrs_1 -norecurse $ROOT/hw/constraints/opt_int_candidates.xdc
 
 launch_runs impl_1 -to_step write_bitstream -jobs $JOBS
 wait_on_run impl_1

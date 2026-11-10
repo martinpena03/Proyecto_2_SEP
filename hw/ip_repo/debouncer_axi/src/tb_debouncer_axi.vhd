@@ -60,6 +60,7 @@ architecture sim of tb_debouncer_axi is
   -- Contadores del monitor: flancos de subida de STATE y de bajada de EDGE por bit.
   type nat_arr is array (0 to 2) of natural;
   signal st_rises : nat_arr := (others => 0);
+  signal leds     : std_logic_vector(3 downto 0);
   signal ed_falls : nat_arr := (others => 0);
 begin
   -- Reloj de 50 MHz; se detiene cuando el estímulo termina (así "run all" retorna).
@@ -79,7 +80,7 @@ begin
     generic map (G_WIDTH => 3, G_TICKS_PER_MS => TPM)
     port map (
       btn_in => btn_in, btn_virt => btn_virt, irq => irq,
-      dbg_state => dbg_state, dbg_edge => dbg_edge, dbg_tick => dbg_tick,
+      dbg_state => dbg_state, dbg_edge => dbg_edge, dbg_tick => dbg_tick, leds => leds,
       s00_axi_aclk => clk, s00_axi_aresetn => rstn,
       s00_axi_awaddr => awaddr, s00_axi_awprot => "000",
       s00_axi_awvalid => awvalid, s00_axi_awready => awready,
@@ -290,9 +291,20 @@ begin
     axi_read(R_STATE, rd);  check(rd(2 downto 0) = "111", "T10 con INV = 0 el reposo se lee como presionado");
     axi_write(R_CTRL, x"00000000");
 
+    ------------------------------------- T11: LED_CTRL (habilitador modo claro)
+    axi_read(16#14#, rd);   check(rd(4 downto 0) = "01111", "T11 reset: patron 0xF, tema oscuro");
+    check(leds = "0000", "T11 tema oscuro -> LEDs apagados");
+    axi_write(16#14#, x"00000015");      -- THEME_LIGHT = 1, patron 0101
+    wait_clk(2);
+    check(leds = "0101", "T11 tema claro -> LEDs = patron");
+    axi_read(16#14#, rd);   check(rd(4 downto 0) = "10101", "T11 relectura LED_CTRL = 0x15");
+    axi_write(16#14#, x"00000005");      -- vuelve a oscuro
+    wait_clk(2);
+    check(leds = "0000", "T11 de vuelta a oscuro -> LEDs apagados");
+
     ---------------------------------------------------------------- fin
     if errors = 0 then
-      report "TB_RESULT: PASS (T1..T10)" severity note;
+      report "TB_RESULT: PASS (T1..T11)" severity note;
     else
       report "TB_RESULT: FAIL, errores = " & integer'image(errors) severity error;
     end if;

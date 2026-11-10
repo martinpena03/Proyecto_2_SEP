@@ -21,6 +21,8 @@
 #define DEB_BTNMASK   0x08u
 #define DEB_STATE     0x0Cu
 #define DEB_EDGE      0x10u
+#define DEB_LEDCTRL   0x14u       /* [3:0] patrón de LEDs, [4] THEME_LIGHT (modo claro) */
+#define LED_THEME     (1u << 4)
 #define CTRL_EN       (1u << 0)
 #define CTRL_IRQ_EN   (1u << 1)
 #define CTRL_INV      (1u << 2)
@@ -38,14 +40,32 @@ int debouncer_init(Debouncer *dev, const DebCfg *cfg)
     if (debcfg_validate(cfg) != 0) return -2;
     dev->base = DEB_BASE;
     dev->cfg  = *cfg;
+    /* dev->light no se toca: el tema lo decide el sensor de luz, no la consola. */
     DEB_WR(dev, DEB_CTRL, 0);                           /* detener mientras se configura */
     DEB_WR(dev, DEB_DEB_MS, cfg->deb_ms);
     DEB_WR(dev, DEB_BTNMASK, cfg->btn_mask & 0x7u);
     DEB_WR(dev, DEB_EDGE, 0x7u);                        /* limpiar flancos viejos (W1C) */
+    DEB_WR(dev, DEB_LEDCTRL, (cfg->led_pattern & 0xFu) | (dev->light ? LED_THEME : 0u));
     DEB_WR(dev, DEB_CTRL, CTRL_EN | CTRL_IRQ_EN | (BTN_ACTIVE_LOW ? CTRL_INV : 0u));
     if ((DEB_RD(dev, DEB_DEB_MS) & 0xFFu) != cfg->deb_ms ||
-        (DEB_RD(dev, DEB_BTNMASK) & 0x7u) != (cfg->btn_mask & 0x7u)) return -3;
+        (DEB_RD(dev, DEB_BTNMASK) & 0x7u) != (cfg->btn_mask & 0x7u) ||
+        (DEB_RD(dev, DEB_LEDCTRL) & 0xFu) != (cfg->led_pattern & 0xFu)) return -3;
     return 0;
+}
+
+/* Habilita (light = 1) o deshabilita el modo claro: el IP enciende LD0..LD3 con el patrón
+ * configurado. Lo llama la máquina de estados cuando la interrupción del OPT3001 cambia
+ * el tema; más adelante el mismo bit elegirá la paleta clara del LCD. */
+void debouncer_set_theme(Debouncer *dev, int light)
+{
+    if (dev == NULL || dev->base == 0u) return;
+    dev->light = (u8)(light != 0);
+    DEB_WR(dev, DEB_LEDCTRL, (dev->cfg.led_pattern & 0xFu) | (dev->light ? LED_THEME : 0u));
+}
+
+u8 debouncer_led_readback(const Debouncer *dev)
+{
+    return (u8)(DEB_RD(dev, DEB_LEDCTRL) & 0x1Fu);
 }
 
 /* Lee las pulsaciones pendientes y las borra (W1C). La relectura asegura que el borrado

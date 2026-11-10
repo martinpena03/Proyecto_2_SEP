@@ -37,6 +37,7 @@ int fsm_apply_cfg(GameCtx *ctx, const DebCfg *cfg)
         debouncer_readback(&ctx->deb, &d, &m);
         p = fmt_str(p, "IP: DEB_MS=");       p = fmt_u32(p, d);
         p = fmt_str(p, " BTN_MASK=0x");      p = fmt_hex(p, m, 1);
+        p = fmt_str(p, " LED_CTRL=0x");      p = fmt_hex(p, debouncer_led_readback(&ctx->deb), 2);
         p = fmt_str(p, " (releidos del hardware)\r\n");
     } else {
         p = fmt_str(p, "IP: debouncer_init fallo, codigo -");
@@ -76,6 +77,33 @@ static int score_qualifies(const GameCtx *ctx, u32 score)
     return score > ctx->rec[MAX_RECORDS - 1u].score;
 }
 
+/* Representación del estado por consola (avance): nombre y teclas que lo mueven.
+ * Teclas de la consola de diagnóstico: 1 = OK (S1), 2 = atrás (S2), u / j = arriba / abajo. */
+static void announce_state(FsmState s)
+{
+    static const char *const NAME[] = {
+        "INIT", "MENU", "LEVEL (seleccion de cancion)", "PLAY (jugando)", "PAUSE",
+        "GAMEOVER", "RECORDS", "CONFIG (parametros por UART)" };
+    static const char *const HINT[] = {
+        "logo; pasa solo al MENU en 1,5 s",
+        "u/j mueve el cursor (Jugar, Records, Configurar), 1 entra",
+        "u/j cambia la cancion (suena el preview), 1 juega, 2 vuelve al MENU",
+        "joystick = flechas, k = sacudida (star power), 2 = PAUSE",
+        "u/j elige (Continuar, Reiniciar, Salir), 1 confirma, 2 continua",
+        "1 o 2 vuelve al MENU",
+        "1 o 2 vuelve al MENU",
+        "escribir los valores y Enter; S2 en la placa cancela" };
+    char b[200];
+    char *p = b;
+    u8 i = ((unsigned)s < 8u) ? (u8)s : 0u;
+    p = fmt_str(p, "\r\n==================== ESTADO: ");
+    p = fmt_str(p, NAME[i]);
+    p = fmt_str(p, " ====================\r\n   ");
+    p = fmt_str(p, HINT[i]);
+    p = fmt_str(p, "\r\n");
+    uart_hal_puts(b);
+}
+
 /* Cambia de estado: guarda el anterior, sella el tiempo, pide redibujo completo y
  * ejecuta la acción de entrada del estado nuevo. */
 static void enter_state(GameCtx *ctx, FsmState ns)
@@ -85,6 +113,7 @@ static void enter_state(GameCtx *ctx, FsmState ns)
     ctx->st      = ns;
     ctx->t_state = clock_sys_ms();
     ctx->redraw_seq++;
+    announce_state(ns);
 
     switch (ns) {
     case ST_INIT:
@@ -166,8 +195,16 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
 {
     u32 now_sys = clock_sys_ms();
 
-    /* En paralelo a todos los estados: tema (OPT3001) y nivel del público (micrófono). */
-    ctx->gs.theme = (u8)theme_current();
+    /* En paralelo a todos los estados: tema (OPT3001) y nivel del público (micrófono).
+     * El tema habilita el modo claro en el IP propio (LEDs LD0..LD3 con el patrón de la
+     * consola); más adelante el mismo bit cambia la paleta del LCD. */
+    {
+        u8 th = (u8)theme_current();
+        if (th != ctx->gs.theme || ctx->deb.light != (u8)(th == THEME_LIGHT)) {
+            debouncer_set_theme(&ctx->deb, th == THEME_LIGHT);
+        }
+        ctx->gs.theme = th;
+    }
     ctx->gs.crowd = sensors_crowd_level();
 
     switch (ctx->st) {

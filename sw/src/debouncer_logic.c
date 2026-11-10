@@ -17,6 +17,7 @@ void debcfg_default(DebCfg *c)
     c->btn_mask     = 0x7u;             /* S1, S2 y JOY_SEL habilitados               */
     c->joy_umbral   = JOY_UMBRAL_DEF;   /* ~50 % del recorrido del joystick           */
     c->umbral_shake = 800u;             /* |a| - 1 g > 0,8 g cuenta como sacudida     */
+    c->led_pattern  = 0xFu;             /* modo claro: los 4 LEDs encendidos          */
 }
 
 /* Comprueba todos los rangos. Devuelve 0 si la configuración es válida o un código
@@ -30,5 +31,6 @@ int debcfg_validate(const DebCfg *c)
     if ((c->btn_mask & 0x5u) == 0u)                        return -4;
     if (c->joy_umbral < JOY_UMBRAL_MIN || c->joy_umbral > JOY_UMBRAL_MAX)   return -5;
     if (c->umbral_shake < SHAKE_MG_MIN || c->umbral_shake > SHAKE_MG_MAX)   return -6;
+    if (c->led_pattern < LED_PAT_MIN || c->led_pattern > LED_PAT_MAX)       return -7;
     return 0;
 }

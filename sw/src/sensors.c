@@ -28,6 +28,8 @@ static u16 g_acc[3];                /* última lectura (diagnóstico)           
 static u8  g_shake_run;             /* muestras seguidas sobre el umbral               */
 static u32 g_shake_last;            /* sys_ms de la última sacudida                    */
 static u32 g_shakes;
+static volatile u32 g_motion_cnt;   /* lo incrementa la ISR; main imprime el aviso      */
+static volatile u16 g_motion_mg;
 
 static u16 g_mic_min = 1023, g_mic_max = 0;          /* ventana en curso             */
 static u16 g_win_min[MIC_WINDOWS], g_win_max[MIC_WINDOWS];
@@ -50,6 +52,8 @@ static u32 isqrt32(u32 v)
 }
 
 void sensors_set_shake_threshold(u16 mg) { g_shake_mg = mg; }
+u32  sensors_motion_count(void)          { return g_motion_cnt; }
+u16  sensors_last_motion_mg(void)        { return g_motion_mg; }
 u8   sensors_crowd_level(void)           { return g_crowd; }
 
 void sensors_feed_mic(u16 s)
@@ -119,6 +123,14 @@ void sensors_sample(void)
     if (g_shake_run >= 2u && (now - g_shake_last) >= SHAKE_REFRACT_MS) {
         g_shake_last = now;
         g_shakes++;
+        /* AO2: evento de movimiento generado dentro de la interrupción de axi_timer_1.
+         * Aquí solo se cuenta; main imprime "Movimiento detectado" (la UART no se usa en
+         * la ISR). |a| - 1 g en mg, con una raíz entera: solo ocurre una vez por evento. */
+        {
+            u32 a_mg = isqrt32((u32)(lhs / 1000000u)) * 1000u / g_cpg;
+            g_motion_mg = (u16)((a_mg > 1000u) ? (a_mg - 1000u) : 0u);
+        }
+        g_motion_cnt++;
         ui_push(UI_SHAKE);                                 /* -> game_try_star_power() */
         input_mute_hits_until(now + SHAKE_MUTE_MS);        /* la palanca se mueve al sacudir */
     }

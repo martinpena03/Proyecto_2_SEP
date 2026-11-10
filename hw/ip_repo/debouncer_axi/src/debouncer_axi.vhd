@@ -17,6 +17,12 @@
 --   0x08 BTN_MASK R/W  [2:0] botones que generan flanco (reset = 0x7)
 --   0x0C STATE    R    [2:0] nivel filtrado (1 = presionado)
 --   0x10 EDGE     R/W1C [2:0] flancos de presión pendientes; escribir 1 borra el bit
+--   0x14 LED_CTRL R/W  [3:0] LED_PATTERN (reset = 0xF), [4] THEME_LIGHT (reset = 0)
+--
+-- Salida leds[3:0] (LD0..LD3 de la Zybo) = LED_PATTERN si THEME_LIGHT = 1, si no 0000.
+-- Es el "habilitador del modo claro": el procesador pone THEME_LIGHT = 1 cuando la
+-- interrupción del OPT3001 indica mucha luz; más adelante el mismo bit elige la paleta
+-- clara del LCD. El patrón lo entrega el usuario por la UART (debouncer_init).
 --
 -- irq = 1 mientras EDGE /= 0 y CTRL.IRQ_EN = 1 (interrupción de nivel alto).
 -- Si un flanco nuevo coincide con el W1C del mismo bit, gana el flanco: no se
@@ -43,6 +49,8 @@ entity debouncer_axi is
     btn_virt        : in  std_logic_vector(G_WIDTH-1 downto 0) := (others => '0');
     -- Interrupción hacia el GIC (nivel alto).
     irq             : out std_logic;
+    -- LEDs de la Zybo: indicador del modo claro.
+    leds            : out std_logic_vector(3 downto 0);
     -- Depuración (ILA / VIO).
     dbg_state       : out std_logic_vector(G_WIDTH-1 downto 0);
     dbg_edge        : out std_logic_vector(G_WIDTH-1 downto 0);
@@ -91,6 +99,8 @@ architecture rtl of debouncer_axi is
   signal edge     : std_logic_vector(W-1 downto 0) := (others => '0');
   signal w1c      : std_logic_vector(W-1 downto 0) := (others => '0');  -- pulso de borrado
   signal irq_r    : std_logic := '0';
+  signal led_pat  : std_logic_vector(3 downto 0) := "1111";
+  signal theme_lt : std_logic := '0';                           -- 1 = tema claro
   -- Núcleo.
   signal btn_pos, btn_mix, state, rise : std_logic_vector(W-1 downto 0);
 begin
@@ -116,6 +126,8 @@ begin
         deb_ms   <= to_unsigned(20, 8);
         btn_mask <= (others => '1');
         w1c      <= (others => '0');
+        led_pat  <= "1111";
+        theme_lt <= '0';
       else
         w1c <= (others => '0');                      -- el pulso de borrado dura 1 ciclo
         if awready = '0' and s00_axi_awvalid = '1' and s00_axi_wvalid = '1' and bvalid = '0' then
@@ -132,6 +144,8 @@ begin
               when "001"  => deb_ms   <= unsigned(s00_axi_wdata(7 downto 0));
               when "010"  => btn_mask <= s00_axi_wdata(W-1 downto 0);
               when "100"  => w1c      <= s00_axi_wdata(W-1 downto 0);
+              when "101"  => led_pat  <= s00_axi_wdata(3 downto 0);
+                             theme_lt <= s00_axi_wdata(4);
               when others => null;                   -- STATE es solo lectura
             end case;
           end if;
@@ -184,6 +198,7 @@ begin
             when "010"  => rdata(W-1 downto 0) <= btn_mask;
             when "011"  => rdata(W-1 downto 0) <= state;
             when "100"  => rdata(W-1 downto 0) <= edge;
+            when "101"  => rdata(4 downto 0)   <= theme_lt & led_pat;
             when others => null;
           end case;
         elsif rvalid = '1' and s00_axi_rready = '1' then
@@ -192,6 +207,8 @@ begin
       end if;
     end if;
   end process;
+
+  leds <= led_pat when theme_lt = '1' else "0000";
 
   s00_axi_awready <= awready;
   s00_axi_wready  <= wready;

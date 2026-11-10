@@ -405,7 +405,7 @@ propio aparezca como interfaz de interrupción (si no, el BSP no genera
 validate_bd_design
 save_bd_design
 make_wrapper -files [get_files design_1.bd] -top -import
-launch_runs impl_1 -to_step write_bitstream -jobs 4
+launch_runs impl_1 -to_step write_bitstream -jobs 2   ;# nunca mas de 2 nucleos
 wait_on_run impl_1
 write_hw_platform -fixed -include_bit -force hw/export/sephero.xsa
 # Guardar el BD en el repo (regenerable con create_project.tcl):

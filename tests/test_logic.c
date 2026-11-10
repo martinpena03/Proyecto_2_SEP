@@ -237,7 +237,10 @@ void test_debcfg(void)
     c.btn_mask = 2;    CHECK(debcfg_validate(&c) == -4);   c.btn_mask = 4;
     CHECK(debcfg_validate(&c) == 0);
     c.joy_umbral = 99; CHECK(debcfg_validate(&c) == -5);   c.joy_umbral = 450;
-    c.umbral_shake = 2001; CHECK(debcfg_validate(&c) == -6);
+    c.umbral_shake = 2001; CHECK(debcfg_validate(&c) == -6);  c.umbral_shake = 800;
+    c.led_pattern = 0;     CHECK(debcfg_validate(&c) == -7);
+    c.led_pattern = 0x10;  CHECK(debcfg_validate(&c) == -7);
+    c.led_pattern = 0x5;   CHECK(debcfg_validate(&c) == 0);
 }
 
 /* ------------------------------------------------------------ uart_config */
@@ -260,9 +263,12 @@ void test_uart_cfg(void)
     stub_uart_feed("9\b0\r\n");                             /* 229 -> retroceso -> 220 */
     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 3);
     stub_uart_feed("\r");                                   /* vacío: conserva 800 */
+    CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 4);
+    stub_uart_feed("a\r");                                  /* patrón de LEDs en hex */
     CHECK(uart_cfg_poll(&u, &out) == 1);
     CHECK(out.deb_ms == 15 && out.btn_mask == 5 && out.joy_umbral == 220 && out.umbral_shake == 800);
-    CHECK(strstr(stub_uart_out, "OK -> DEB_MS=15 BTN_MASK=0x5 JOY_UMBRAL=220 UMBRAL_SHAKE=800 mg") != NULL);
+    CHECK(out.led_pattern == 0xA);
+    CHECK(strstr(stub_uart_out, "OK -> DEB_MS=15 BTN_MASK=0x5 JOY_UMBRAL=220 UMBRAL_SHAKE=800 mg LED_PATTERN=0xA") != NULL);
 
     /* Valores inválidos: repite el paso. */
     stub_uart_out[0] = '\0';
@@ -274,5 +280,9 @@ void test_uart_cfg(void)
     stub_uart_feed("30\n2\n");  CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 1);   /* máscara sin OK */
     stub_uart_feed("7\n99\n");  CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 2);
     stub_uart_feed("300\n5000\n1500\n");
+    CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 4);
+    stub_uart_feed("0\n");     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 4);   /* patrón 0 no */
+    stub_uart_feed("3\n");
     CHECK(uart_cfg_poll(&u, &out) == 1 && out.deb_ms == 30 && out.joy_umbral == 300 && out.umbral_shake == 1500);
+    CHECK(out.led_pattern == 3);
 }

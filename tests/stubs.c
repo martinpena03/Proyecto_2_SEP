@@ -125,6 +125,11 @@ int debouncer_init(Debouncer *dev, const DebCfg *cfg)
 }
 u8   debouncer_get_edges(Debouncer *dev)       { (void)dev; return 0; }
 u8   debouncer_get_state(const Debouncer *dev) { (void)dev; return 0; }
+void debouncer_set_theme(Debouncer *dev, int light) { dev->light = (u8)(light != 0); }
+u8   debouncer_led_readback(const Debouncer *dev)
+{
+    return (u8)((dev->light ? 0x10u : 0u) | (dev->cfg.led_pattern & 0xFu));
+}
 void debouncer_readback(const Debouncer *dev, u16 *deb_ms, u8 *btn_mask)
 {
     *deb_ms   = dev->cfg.deb_ms;

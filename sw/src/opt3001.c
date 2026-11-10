@@ -17,6 +17,12 @@
  *   0x03 HIGH_LIMIT  límite superior
  *   0x7E / 0x7F      identificadores: 0x5449 ("TI") y 0x3001
  *
+ * Interrupción (AO2): el INT del OPT3001 llega a axi_gpio_1 (GIC 64). Como el pin no
+ * estaba identificado, axi_gpio_1 tiene los 17 pines Pmod candidatos y en el arranque
+ * opt3001_detect_int() alterna POL (CONFIG[3]) y busca el bit que la sigue. Si ninguno lo
+ * hace, el comparador de ventana del sensor sigue funcionando por hardware y su bandera
+ * FH/FL se lee cada 200 ms (respaldo por timer).
+ *
  * Histéresis: en tema CLARO la ventana es [lo, máx]: el INT se activa cuando lux < lo y
  * se pasa a OSCURO; en OSCURO la ventana es [0, hi]: el INT se activa cuando lux > hi.
  * El I2C se usa solo desde main: gpio_isr() únicamente levanta opt_pending.
@@ -41,6 +47,18 @@ static int g_sensor_ok;
 static volatile Theme g_theme = THEME_DARK;
 static u32 g_last_poll;
 volatile u32 g_theme_changes;
+
+/* Nombres de los candidatos (orden de OPT_CAND en hw/scripts/02_build_bd.tcl). */
+static const char *const OPT_CAND_NAME[OPT_CAND_N] = {
+    "JD7 (U14)", "JD8 (U15)", "JC1 (V15)", "JC2 (W15)", "JC3 (T11)", "JC4 (T10)",
+    "JE8 (U17)", "JE9 (T17)", "JE10 (Y17)",
+    "JA1 (N15)", "JA2 (L14)", "JA3 (K16)", "JA4 (K14)",
+    "JA7 (N16)", "JA8 (L15)", "JA9 (J16)", "JA10 (J14)" };
+
+const char *opt_cand_name(u8 bit)
+{
+    return (bit < OPT_CAND_N) ? OPT_CAND_NAME[bit] : "ninguno (respaldo por timer)";
+}
 
 /* Convierte lux enteros al formato exponente/mantisa del sensor (resolución 0,01 lux). */
 u16 lux_to_reg(u32 lux)
@@ -94,6 +112,33 @@ int opt3001_init(const Opt3001Cfg *cfg)
     return 0;
 }
 
+/* Busca el pin del INT: con el lux dentro de la ventana no hay evento y el pin queda en
+ * su nivel inactivo, que depende de POL (POL = 0: suelto -> 1 por el pull-up; POL = 1:
+ * el sensor lo tira a 0). El bit que vale ~POL en las 6 muestras es el INT. Requiere
+ * gpio1_init() antes. Deja CONFIG como estaba y el latch limpio. */
+u8 opt3001_detect_int(void)
+{
+    const u32 mask = (1u << OPT_CAND_N) - 1u;
+    u32 anti = mask, follow = mask, v;
+    u8 i, bit = OPT_BIT_NONE;
+
+    for (i = 0; i < 6u; i++) {
+        (void)opt_write_reg(OPT_CONFIG, (i & 1u) ? (OPT_CFG_VAL | 0x0008u) : OPT_CFG_VAL);
+        usleep(20000);
+        v = gpio1_read() & mask;
+        if (i & 1u) { anti &= ~v; follow &= v;  }        /* POL = 1 */
+        else        { anti &= v;  follow &= ~v; }        /* POL = 0 */
+    }
+    (void)opt_write_reg(OPT_CONFIG, OPT_CFG_VAL);
+    (void)opt_read_reg(OPT_CONFIG);
+    if (anti == 0u) anti = follow;                       /* por si el pin llega invertido */
+    for (i = 0; i < OPT_CAND_N; i++) {
+        if ((anti >> i) & 1u) { bit = i; break; }
+    }
+    xil_printf("[OPT] busqueda del INT: candidatos=0x%05x -> %s\r\n", (int)anti, opt_cand_name(bit));
+    return bit;
+}
+
 /* ------------------------------- tema -------------------------------------- */
 
 void theme_init(int sensor_ok, const Opt3001Cfg *cfg)
@@ -107,23 +152,34 @@ Theme theme_current(void) { return g_theme; }
 
 /* Desde main, en cada vuelta: si el OPT3001 interrumpió, lee el sensor por I2C, cambia el
  * tema y rearma la ventana. Como respaldo, cada 500 ms revisa el nivel del pin por si se
- * perdió un flanco (el INT queda en bajo hasta que se lee CONFIG). */
+ * perdió un flanco (el INT queda en bajo hasta que se lee CONFIG). Sin pin INT, cada
+ * 200 ms lee las banderas FH/FL que el comparador del sensor dejó enganchadas. */
 void theme_task(void)
 {
     u32 now = clock_sys_ms();
     u16 cfg, lux;
     Theme nt;
+    const char *src;
 
     if (!g_sensor_ok) return;
-    if (!opt_pending) {
-        if ((now - g_last_poll) < 500u) return;
+    if (g_opt_bit == OPT_BIT_NONE) {
+        if ((now - g_last_poll) < 200u) return;
         g_last_poll = now;
-        if (((gpio1_read() >> g_opt_bit) & 1u) != 0u) return;     /* INT inactivo */
+        cfg = opt_read_reg(OPT_CONFIG);                 /* borra el latch; trae FH / FL */
+        if ((cfg & (OPT_FLAG_FH | OPT_FLAG_FL)) == 0u) return;
+        src = "comparador OPT3001 (respaldo timer)";
+    } else {
+        if (!opt_pending) {
+            if ((now - g_last_poll) < 500u) return;
+            g_last_poll = now;
+            if (((gpio1_read() >> g_opt_bit) & 1u) != 0u) return; /* INT inactivo */
+        }
+        opt_pending = 0;
+        g_last_poll = now;
+        cfg = opt_read_reg(OPT_CONFIG);                 /* borra el latch; trae FH / FL */
+        src = "interrupcion INT OPT3001 (GIC 64)";
     }
-    opt_pending = 0;
-    g_last_poll = now;
 
-    cfg = opt_read_reg(OPT_CONFIG);                     /* borra el latch; trae FH / FL */
     lux = opt3001_read_lux();
     nt  = g_theme;
     if (cfg & OPT_FLAG_FL)      nt = THEME_DARK;        /* lux < LOW_LIMIT  */
@@ -134,9 +190,15 @@ void theme_task(void)
     if (nt != g_theme) {
         g_theme = nt;
         g_theme_changes++;
+        if (nt == THEME_LIGHT)
+            xil_printf("\r\n*** [AO2] Mucha luz *** lux=%d (> %d)  fuente: %s -> modo claro, LEDs ON\r\n",
+                       lux, g_cfg.hi_lux, src);
+        else
+            xil_printf("\r\n*** [AO2] Poca luz *** lux=%d (< %d)  fuente: %s -> modo oscuro, LEDs OFF\r\n",
+                       lux, g_cfg.lo_lux, src);
         opt3001_arm(nt);
     }
     (void)opt_read_reg(OPT_CONFIG);                     /* limpia eventos pendientes */
-    xil_printf("[OPT] INT lux=%d CONFIG=0x%04x tema=%s\r\n", lux, cfg,
+    xil_printf("[OPT] evento lux=%d CONFIG=0x%04x tema=%s\r\n", lux, cfg,
                (g_theme == THEME_LIGHT) ? "CLARO" : "OSCURO");
 }

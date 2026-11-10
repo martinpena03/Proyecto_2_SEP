@@ -166,6 +166,7 @@ void gpio_isr(void *ref)
     u32 st = XGpio_InterruptGetStatus(&gpio1);
     (void)ref;
     XGpio_InterruptClear(&gpio1, st);
+    if (g_opt_bit == OPT_BIT_NONE) return;          /* sin pin INT: respaldo por timer */
     if ((st & XGPIO_IR_CH1_MASK) && ((XGpio_DiscreteRead(&gpio1, 1) >> g_opt_bit) & 1u) == 0u) {
         opt_pending = 1;
     }

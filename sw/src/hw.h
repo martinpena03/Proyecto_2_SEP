@@ -19,6 +19,8 @@
 #ifndef OPT_INT_BIT
 #define OPT_INT_BIT    0     /* bit de axi_gpio_1 al que llega el INT del OPT3001           */
 #endif
+#define OPT_CAND_N     17u   /* candidatos del INT en axi_gpio_1 (02_build_bd.tcl, OPT_CAND) */
+#define OPT_BIT_NONE   0xFFu /* INT no detectado: respaldo por timer                         */
 #ifndef SEP_MUTE
 #define SEP_MUTE       0     /* 1 = el firmware arranca con el buzzer deshabilitado          */
 #endif
@@ -49,9 +51,13 @@ int  sensors_init(void);                  /* calibra en reposo; 0 = OK          
 void sensors_sample(void);                /* desde timer1 (10 ms)                        */
 void sensors_feed_mic(u16 sample);        /* muestra del micrófono (2 ms)                */
 void sensors_get_debug(u16 *acc, u16 *cpg, u16 *mic_p2p, u16 *mic_noise, u32 *shakes);
+u32  sensors_motion_count(void);          /* movimientos detectados por la ISR (AO2)     */
+u16  sensors_last_motion_mg(void);        /* |a| - 1 g del último movimiento [mg]        */
 
 /* ---- opt3001.c / theme.c: sensor de luz ------------------------------------ */
 int  opt3001_init(const Opt3001Cfg *cfg); /* 0 = OK, < 0 = sin sensor                    */
+u8   opt3001_detect_int(void);            /* bit de axi_gpio_1 con el INT o OPT_BIT_NONE */
+const char *opt_cand_name(u8 bit);        /* "JA3 (K16)" etc.                            */
 u16  opt3001_read_lux(void);
 void opt3001_arm(Theme t);                /* fija LOW/HIGH_LIMIT según el tema           */
 u16  lux_to_reg(u32 lux);

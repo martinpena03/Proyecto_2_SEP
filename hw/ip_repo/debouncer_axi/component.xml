@@ -264,7 +264,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>610287b9</spirit:value>
+            <spirit:value>193acc92</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -280,7 +280,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>610287b9</spirit:value>
+            <spirit:value>193acc92</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -344,6 +344,23 @@
           <spirit:wireTypeDefs>
             <spirit:wireTypeDef>
               <spirit:typeName>std_logic</spirit:typeName>
+              <spirit:viewNameRef>xilinx_anylanguagesynthesis</spirit:viewNameRef>
+              <spirit:viewNameRef>xilinx_anylanguagebehavioralsimulation</spirit:viewNameRef>
+            </spirit:wireTypeDef>
+          </spirit:wireTypeDefs>
+        </spirit:wire>
+      </spirit:port>
+      <spirit:port>
+        <spirit:name>leds</spirit:name>
+        <spirit:wire>
+          <spirit:direction>out</spirit:direction>
+          <spirit:vector>
+            <spirit:left spirit:format="long">3</spirit:left>
+            <spirit:right spirit:format="long">0</spirit:right>
+          </spirit:vector>
+          <spirit:wireTypeDefs>
+            <spirit:wireTypeDef>
+              <spirit:typeName>std_logic_vector</spirit:typeName>
               <spirit:viewNameRef>xilinx_anylanguagesynthesis</spirit:viewNameRef>
               <spirit:viewNameRef>xilinx_anylanguagebehavioralsimulation</spirit:viewNameRef>
             </spirit:wireTypeDef>
@@ -787,7 +804,7 @@
       <spirit:file>
         <spirit:name>src/debouncer_axi.vhd</spirit:name>
         <spirit:fileType>vhdlSource</spirit:fileType>
-        <spirit:userFileType>CHECKSUM_d1d85dc7</spirit:userFileType>
+        <spirit:userFileType>CHECKSUM_dd09d68a</spirit:userFileType>
       </spirit:file>
     </spirit:fileSet>
     <spirit:fileSet>
@@ -871,15 +888,15 @@
       <xilinx:displayName>debouncer_axi (Sep Hero)</xilinx:displayName>
       <xilinx:definitionSource>package_project</xilinx:definitionSource>
       <xilinx:vendorDisplayName>Sep Hero - IEE2463 UC</xilinx:vendorDisplayName>
-      <xilinx:coreRevision>1</xilinx:coreRevision>
-      <xilinx:coreCreationDateTime>2026-11-10T05:49:04Z</xilinx:coreCreationDateTime>
+      <xilinx:coreRevision>2</xilinx:coreRevision>
+      <xilinx:coreCreationDateTime>2026-11-10T17:40:26Z</xilinx:coreCreationDateTime>
     </xilinx:coreExtensions>
     <xilinx:packagingInfo>
       <xilinx:xilinxVersion>2020.1</xilinx:xilinxVersion>
       <xilinx:checksum xilinx:scope="busInterfaces" xilinx:value="3094caf4"/>
       <xilinx:checksum xilinx:scope="memoryMaps" xilinx:value="871c369d"/>
-      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="ec6a05e7"/>
-      <xilinx:checksum xilinx:scope="ports" xilinx:value="e6b829d1"/>
+      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="3b0425aa"/>
+      <xilinx:checksum xilinx:scope="ports" xilinx:value="656513ac"/>
       <xilinx:checksum xilinx:scope="hdlParameters" xilinx:value="8c53062a"/>
       <xilinx:checksum xilinx:scope="parameters" xilinx:value="01d5da43"/>
     </xilinx:packagingInfo>

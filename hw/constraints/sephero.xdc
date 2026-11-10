@@ -36,3 +36,9 @@ set_property -dict { PACKAGE_PIN R14 IOSTANDARD LVCMOS33 PULLUP true } [get_port
 ## ---- INT del OPT3001 (open-drain, activo en bajo) -> axi_gpio_1
 ## El pin se agrega aquí una vez identificado con el buscador de pin
 ## (hw/scripts/02_build_bd.tcl en modo "finder"; ver docs/MANUAL_IMPLEMENTACION.md §15.1).
+
+## ---- LEDs LD0..LD3 de la Zybo <- debouncer_axi_0/leds (indicador del modo claro)
+set_property -dict { PACKAGE_PIN M14 IOSTANDARD LVCMOS33 } [get_ports { leds[0] }];  # LD0
+set_property -dict { PACKAGE_PIN M15 IOSTANDARD LVCMOS33 } [get_ports { leds[1] }];  # LD1
+set_property -dict { PACKAGE_PIN G14 IOSTANDARD LVCMOS33 } [get_ports { leds[2] }];  # LD2
+set_property -dict { PACKAGE_PIN D18 IOSTANDARD LVCMOS33 } [get_ports { leds[3] }];  # LD3

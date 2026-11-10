@@ -9,12 +9,12 @@
  * Portable: solo usa uart_hal_getc() / uart_hal_puts() (uart_hal.c en la placa, stubs
  * en el PC). No usa printf ni scanf.
  *
- * El usuario entrega 4 parámetros: DEB_MS y BTN_MASK (van al IP propio por
+ * El usuario entrega 5 parámetros: DEB_MS, BTN_MASK y LED_PATTERN (van al IP propio por
  * debouncer_init), JOY_UMBRAL (input.c) y UMBRAL_SHAKE (sensors.c).
  */
 #include "interfaces.h"
 
-#define N_STEPS 4u
+#define N_STEPS 5u
 
 /* ----------------------- utilidades de formato (sin printf) ----------------------- */
 
@@ -66,9 +66,13 @@ static void prompt(const UartCfg *u)
         p = fmt_str(p, "JOY_UMBRAL [100-450] (actual ");
         p = fmt_u32(p, u->tmp.joy_umbral);
         break;
-    default:
+    case 3:
         p = fmt_str(p, "UMBRAL_SHAKE [mg 200-2000] (actual ");
         p = fmt_u32(p, u->tmp.umbral_shake);
+        break;
+    default:
+        p = fmt_str(p, "LED_PATTERN modo claro [hex 1-F: LD3..LD0] (actual ");
+        p = fmt_hex(p, u->tmp.led_pattern, 1);
         break;
     }
     p = fmt_str(p, "): ");
@@ -102,7 +106,7 @@ static int accept_line(UartCfg *u)
     u32 v = 0;
     u->line[u->len] = '\0';
     if (u->len == 0u) return 1;                       /* línea vacía: conserva el valor */
-    if (parse_num(u->line, u->step == 1u, &v) != 0) return 0;
+    if (parse_num(u->line, u->step == 1u || u->step == 4u, &v) != 0) return 0;
     switch (u->step) {
     case 0:
         if (v < DEB_MS_MIN || v > DEB_MS_MAX) return 0;
@@ -116,9 +120,13 @@ static int accept_line(UartCfg *u)
         if (v < JOY_UMBRAL_MIN || v > JOY_UMBRAL_MAX) return 0;
         u->tmp.joy_umbral = (u16)v;
         break;
-    default:
+    case 3:
         if (v < SHAKE_MG_MIN || v > SHAKE_MG_MAX) return 0;
         u->tmp.umbral_shake = (u16)v;
+        break;
+    default:
+        if (v < LED_PAT_MIN || v > LED_PAT_MAX) return 0;
+        u->tmp.led_pattern = (u8)v;
         break;
     }
     return 1;
@@ -156,7 +164,7 @@ int uart_cfg_poll(UartCfg *u, DebCfg *out)
             }
             u->len = 0;
             if (u->step >= N_STEPS) {
-                char b[96];
+                char b[128];
                 char *p = b;
                 if (debcfg_validate(&u->tmp) != 0) {  /* no debería ocurrir: se revalida */
                     uart_hal_puts("Configuracion invalida, se repite\r\n");
@@ -168,7 +176,8 @@ int uart_cfg_poll(UartCfg *u, DebCfg *out)
                 p = fmt_str(p, " BTN_MASK=0x");        p = fmt_hex(p, u->tmp.btn_mask, 1);
                 p = fmt_str(p, " JOY_UMBRAL=");        p = fmt_u32(p, u->tmp.joy_umbral);
                 p = fmt_str(p, " UMBRAL_SHAKE=");      p = fmt_u32(p, u->tmp.umbral_shake);
-                p = fmt_str(p, " mg\r\n");
+                p = fmt_str(p, " mg LED_PATTERN=0x");  p = fmt_hex(p, u->tmp.led_pattern, 1);
+                p = fmt_str(p, "\r\n");
                 uart_hal_puts(b);
                 *out = u->tmp;
                 return 1;
