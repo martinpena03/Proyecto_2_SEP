@@ -26,7 +26,8 @@ typedef int32_t  s32;
 /* Parámetros del juego                                               */
 /* ------------------------------------------------------------------ */
 #define N_LANES           4u       /* carriles: <- ^ v -> (direcciones del joystick)     */
-#define HIT_WIN_MS        120u     /* |t_golpe - t_nota| máximo para un acierto          */
+#define HIT_WIN_MS        200u     /* |t_golpe - t_nota| máximo para un acierto (ampliado
+                                    * de 120 a 200 ms tras probar en la placa)           */
 #define PTS_NOTA          100u     /* puntos por nota (x2 con star power)                */
 #define STAR_STREAK       10u      /* aciertos seguidos que llenan la barra de poder     */
 #define STAR_MS           20000u   /* duración del star power                            */
@@ -45,8 +46,9 @@ typedef int32_t  s32;
 #define JOY_TICK_MS       2u       /* periodo de axi_timer_1 (muestreo del joystick)     */
 #define SENS_DIV          5u       /* acelerómetro y micrófono cada 5 ticks = 10 ms      */
 #define FRAME_DIV         15u      /* frame cada 15 ticks = 30 ms (~33 FPS)              */
-#define JOY_UMBRAL_DEF    250u     /* desviación (cuentas de 10 bits) para "dirección"   */
-#define JOY_HIST          80u      /* vuelve a centro bajo JOY_UMBRAL - JOY_HIST         */
+#define JOY_UMBRAL_DEF    180u     /* desviación (cuentas de 10 bits) para "dirección"   */
+#define JOY_HIST          60u      /* vuelve a centro bajo JOY_UMBRAL - JOY_HIST         */
+#define JOY_SETTLE_N      3u       /* muestras de espera antes de decidir la dirección   */
 #define HIT_Q_LEN         16u      /* cola de golpes (potencia de 2)                     */
 #define UI_Q_LEN          8u       /* cola de eventos de interfaz (potencia de 2)        */
 

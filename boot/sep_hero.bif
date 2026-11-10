@@ -1,0 +1,11 @@
+// sep_hero.bif - Imagen de arranque de Sep Hero (AC4).
+// La genera sw/scripts/make_boot.sh, que copia aquí los tres archivos:
+//   zynq_fsbl.elf          FSBL de la plataforma (first stage boot loader)
+//   design_1_wrapper.bit   bitstream del block design
+//   sep_hero.elf           aplicación (build Release)
+the_ROM_image:
+{
+    [bootloader] zynq_fsbl.elf
+    design_1_wrapper.bit
+    sep_hero.elf
+}

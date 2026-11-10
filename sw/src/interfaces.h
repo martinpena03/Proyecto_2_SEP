@@ -86,13 +86,14 @@ void clock_song_run(int run);
 /* ====================================================================== */
 
 /* joy_logic.c: detector de dirección con eje dominante e histéresis. */
-typedef enum { JS_CENTER = 0, JS_HELD = 1 } JoyPhase;
+typedef enum { JS_CENTER = 0, JS_HELD = 1, JS_SETTLE = 2 } JoyPhase;
 typedef struct {
     JoyPhase ph;        /* centro o dirección mantenida            */
     Lane     dir;       /* última dirección detectada              */
     u16      umbral;    /* desviación mínima para "dirección"      */
     s16      x0, y0;    /* centro calibrado                        */
     u8       inv_y;     /* 1 = invertir el signo del eje Y         */
+    u8       settle;    /* muestras que faltan para decidir        */
 } JoyDet;
 void joy_det_init(JoyDet *d, u16 x0, u16 y0, u16 umbral, u8 inv_y);
 int  joy_detect(JoyDet *d, u16 x, u16 y);   /* Lane recién activada o -1 */

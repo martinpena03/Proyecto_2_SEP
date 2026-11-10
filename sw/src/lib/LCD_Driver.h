@@ -67,6 +67,11 @@ typedef struct{
 function:	
 			Macro definition variable name
 ********************************************************************************/
+/* Sep Hero: instancias y estado expuestos para lcd_fast.c (envio por rafagas). */
+extern XSpi  SpiInstance;
+extern XGpio gpio0;
+extern LCD_DIS sLCD_DIS;
+
 void LCD_Init( LCD_SCAN_DIR Lcd_ScanDir );
 void LCD_SetGramScanWay(LCD_SCAN_DIR Scan_dir);
 

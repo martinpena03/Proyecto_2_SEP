@@ -23,6 +23,7 @@ void joy_det_init(JoyDet *d, u16 x0, u16 y0, u16 umbral, u8 inv_y)
     d->x0     = (s16)x0;
     d->y0     = (s16)y0;
     d->inv_y  = inv_y;
+    d->settle = 0;
 }
 
 /* Devuelve la dirección recién activada (IZQ..DER) o -1 si no hay evento nuevo. */
@@ -38,7 +39,17 @@ int joy_detect(JoyDet *d, u16 x, u16 y)
     mag = (ax > ay) ? ax : ay;
 
     if (d->ph == JS_CENTER) {
-        if (mag > d->umbral) {
+        if (mag > d->umbral) {                 /* cruzó el umbral: aún no se decide */
+            d->ph = JS_SETTLE;
+            d->settle = JOY_SETTLE_N;
+        }
+    } else if (d->ph == JS_SETTLE) {
+        /* Tolerancia angular: al cruzar el umbral en diagonal el eje dominante puede ser
+         * el equivocado. Se esperan JOY_SETTLE_N muestras (6 ms) para que la palanca
+         * avance y se decide con la posición final, donde el eje pedido ya domina. */
+        if (mag < (u16)(d->umbral - JOY_HIST)) {
+            d->ph = JS_CENTER;                 /* fue un roce: se descarta */
+        } else if (--d->settle == 0u) {
             if (ax >= ay) d->dir = (dx < 0) ? IZQ : DER;       /* eje X dominante */
             else          d->dir = (dy > 0) ? ARRIBA : ABAJO;  /* eje Y dominante */
             d->ph = JS_HELD;

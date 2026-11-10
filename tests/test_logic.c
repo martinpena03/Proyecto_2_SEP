@@ -103,31 +103,43 @@ void test_engine(void)
 }
 
 /* -------------------------------------------------------------- joy_logic */
+/* Repite la muestra hasta que el detector decide (espera JOY_SETTLE_N muestras). */
+static int jd(JoyDet *d, u16 x, u16 y)
+{
+    int i, r = -1;
+    for (i = 0; i <= (int)JOY_SETTLE_N && r < 0; i++) r = joy_detect(d, x, y);
+    return r;
+}
+
 void test_joy(void)
 {
     JoyDet d;
     joy_det_init(&d, 512, 512, 250, 0);
-    CHECK(joy_detect(&d, 512, 512) == -1);                 /* centro */
-    CHECK(joy_detect(&d, 700, 520) == -1);                 /* bajo el umbral */
-    CHECK(joy_detect(&d, 900, 520) == DER);
-    CHECK(joy_detect(&d, 900, 520) == -1);                 /* mantener no repite */
-    CHECK(joy_detect(&d, 700, 512) == -1);                 /* dentro de la histéresis: sigue */
-    CHECK(joy_detect(&d, 900, 512) == -1);
-    CHECK(joy_detect(&d, 600, 512) == -1);                 /* bajo umbral - hist: rearma */
-    CHECK(joy_detect(&d, 100, 512) == IZQ);
-    (void)joy_detect(&d, 512, 512);
-    CHECK(joy_detect(&d, 512, 900) == ARRIBA);
-    (void)joy_detect(&d, 512, 512);
-    CHECK(joy_detect(&d, 512, 100) == ABAJO);
-    (void)joy_detect(&d, 512, 512);
-    CHECK(joy_detect(&d, 900, 850) == DER);                /* diagonal: eje dominante X */
-    (void)joy_detect(&d, 512, 512);
-    CHECK(joy_detect(&d, 800, 100) == ABAJO);              /* diagonal: eje dominante Y */
+    CHECK(joy_detect(&d, 900, 512) == -1);                 /* no decide al instante...   */
+    CHECK(joy_detect(&d, 600, 900) == -1 && joy_detect(&d, 560, 900) == -1);
+    CHECK(joy_detect(&d, 530, 900) == ARRIBA);             /* ...sino con la posicion final */
+    (void)jd(&d, 512, 512);
+    CHECK(jd(&d, 512, 512) == -1);                 /* centro */
+    CHECK(jd(&d, 700, 520) == -1);                 /* bajo el umbral */
+    CHECK(jd(&d, 900, 520) == DER);
+    CHECK(jd(&d, 900, 520) == -1);                 /* mantener no repite */
+    CHECK(jd(&d, 720, 512) == -1);                 /* dentro de la histéresis: sigue */
+    CHECK(jd(&d, 900, 512) == -1);
+    CHECK(jd(&d, 600, 512) == -1);                 /* bajo umbral - hist: rearma */
+    CHECK(jd(&d, 100, 512) == IZQ);
+    (void)jd(&d, 512, 512);
+    CHECK(jd(&d, 512, 900) == ARRIBA);
+    (void)jd(&d, 512, 512);
+    CHECK(jd(&d, 512, 100) == ABAJO);
+    (void)jd(&d, 512, 512);
+    CHECK(jd(&d, 900, 850) == DER);                /* diagonal: eje dominante X */
+    (void)jd(&d, 512, 512);
+    CHECK(jd(&d, 800, 100) == ABAJO);              /* diagonal: eje dominante Y */
     /* Centro calibrado distinto de 512 y eje Y invertido. */
     joy_det_init(&d, 500, 530, 250, 1);
-    CHECK(joy_detect(&d, 500, 900) == ABAJO);
-    (void)joy_detect(&d, 500, 530);
-    CHECK(joy_detect(&d, 500, 150) == ARRIBA);
+    CHECK(jd(&d, 500, 900) == ABAJO);
+    (void)jd(&d, 500, 530);
+    CHECK(jd(&d, 500, 150) == ARRIBA);
 }
 
 /* ------------------------------------------------------------- sd_formats */
