@@ -258,6 +258,9 @@ void test_uart_cfg(void)
     CHECK(uart_cfg_poll(&u, &out) == 0);                    /* sin datos: no bloquea */
     stub_uart_feed("15\r\n");
     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 1);
+    /* La pregunta de BTN_MASK es la más larga: debe salir completa (el buffer de
+     * prompt() se desbordó en la placa cuando medía 80). */
+    CHECK(strstr(stub_uart_out, "SEL=silencio] (actual 7): ") != NULL);
     stub_uart_feed("0x5\r");
     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 2);
     stub_uart_feed("\n22");                                 /* '\n' suelto del par CR LF */

@@ -51,7 +51,7 @@ char *fmt_hex(char *dst, u32 v, u8 digits)
 /* Imprime la pregunta del paso actual con el valor vigente. */
 static void prompt(const UartCfg *u)
 {
-    char b[80];
+    char b[160];                     /* la pregunta más larga (BTN_MASK) mide ~95 */
     char *p = b;
     switch (u->step) {
     case 0:
