@@ -16,7 +16,7 @@ u32   stub_sys_ms, stub_song_ms;
 int   stub_song_running;
 int   stub_play_mode;
 int   stub_flush_count;
-u16   stub_joy_umbral, stub_shake_mg;
+u16   stub_shake_mg;
 u8    stub_crowd;
 Theme stub_theme;
 u16   stub_tone_f;
@@ -39,7 +39,7 @@ void stub_reset(void)
     stub_song_running = 0;
     stub_play_mode = 0;
     stub_flush_count = 0;
-    stub_joy_umbral = stub_shake_mg = 0;
+    stub_shake_mg = 0;
     stub_crowd = 0;
     stub_theme = THEME_DARK;
     stub_tone_f = 0;
@@ -87,7 +87,6 @@ void clock_song_run(int run)   { stub_song_running = (run != 0); }
 
 /* ----------------------------- entradas (input.c) -------------------------- */
 void input_set_play_mode(int play)      { stub_play_mode = play; }
-void input_set_joy_umbral(u16 umbral)   { stub_joy_umbral = umbral; }
 void input_flush(void)                  { hq_head = hq_tail = 0; stub_flush_count++; }
 UiEvent ui_pop(void)                    { return UI_NONE; }
 int hit_pop(Hit *out)

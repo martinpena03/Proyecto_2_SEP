@@ -32,7 +32,6 @@ int fsm_apply_cfg(GameCtx *ctx, const DebCfg *cfg)
     ctx->cfg_status = r;
     if (r == 0) {
         ctx->cfg = *cfg;
-        input_set_joy_umbral(cfg->joy_umbral);
         sensors_set_shake_threshold(cfg->umbral_shake);
         debouncer_readback(&ctx->deb, &d, &m);
         p = fmt_str(p, "IP: DEB_MS=");       p = fmt_u32(p, d);
@@ -85,10 +84,10 @@ static void announce_state(FsmState s)
         "INIT", "MENU", "LEVEL (seleccion de cancion)", "PLAY (jugando)", "PAUSE",
         "GAMEOVER", "RECORDS", "CONFIG (parametros por UART)" };
     static const char *const HINT[] = {
-        "logo; pasa solo al MENU en 1,5 s",
-        "u/j mueve el cursor (Jugar, Records, Configurar), 1 entra",
-        "u/j cambia la cancion (suena el preview), 1 juega, 2 vuelve al MENU",
-        "joystick = flechas, k = sacudida (star power), 2 = PAUSE",
+        "inicio; pasa solo al MENU en 1,5 s",
+        "u/j (o JOY_SEL) mueve el cursor (Jugar, Records, Configurar), 1 (o S1) entra",
+        "u/j cambia la cancion (suena el preview), 1 juega, 2 (o S2) vuelve al MENU",
+        "p = autoplay (sin joystick en el avance), sacudir la placa = star power, 2 = PAUSE",
         "u/j elige (Continuar, Reiniciar, Salir), 1 confirma, 2 continua",
         "1 o 2 vuelve al MENU",
         "1 o 2 vuelve al MENU",

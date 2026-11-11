@@ -11,15 +11,15 @@
 #   sh sw/scripts/build_app.sh release   -> el entregable: -O2, con sonido, sin diagnóstico
 #   sh sw/scripts/build_app.sh sound     -> como debug pero con sonido (pruebas con el
 #                                           usuario presente)
-# Variables opcionales:  EXTRA="-DOPT_INT_BIT=3 -DJOY_INVERT_Y=1"
+# Variables opcionales:  EXTRA="-D..."
 # Salida: sw/workspace/sep_hero/<Debug|Release|Sound>/sep_hero.elf
 # Requiere haber corrido antes:  xsct sw/scripts/vitis_platform.tcl
 # =============================================================================
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CFG="${1:-debug}"
 case "$CFG" in
-  debug)   OUTN=Debug;   OPT="-O0 -g3 -DSEP_DIAG -DSEP_MUTE=1" ;;
-  sound)   OUTN=Sound;   OPT="-O0 -g3 -DSEP_DIAG -DSEP_MUTE=0" ;;
+  debug)   OUTN=Debug;   OPT="-O0 -g3 -DSEP_MUTE=1" ;;
+  sound)   OUTN=Sound;   OPT="-O0 -g3 -DSEP_MUTE=0" ;;
   release) OUTN=Release; OPT="-O2 -DSEP_MUTE=0" ;;
   *) echo "uso: sh build_app.sh [debug|sound|release]"; exit 1 ;;
 esac
@@ -48,6 +48,6 @@ done
 arm-none-eabi-gcc -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -Wl,-build-id=none \
   -specs="$SPEC" -Wl,-T -Wl,"$LD" -Wl,--gc-sections -L"$BSP/bsplib/lib" \
   -o "$OUT/sep_hero.elf" $OBJS \
-  -lm -Wl,--start-group,-lxil,-lxilffs,-lgcc,-lc,--end-group || exit 1
+  -lm -Wl,--start-group,-lxil,-lgcc,-lc,--end-group || exit 1
 arm-none-eabi-size "$OUT/sep_hero.elf"
 echo "ELF_OK $OUT/sep_hero.elf"

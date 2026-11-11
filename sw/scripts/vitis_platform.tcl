@@ -1,6 +1,6 @@
 # =============================================================================
 # vitis_platform.tcl - Crea (o actualiza) el workspace de Vitis de Sep Hero:
-# plataforma standalone con FSBL, BSP con xilffs y la aplicación vacía sep_hero.
+# plataforma standalone con FSBL, BSP (sin xilffs en el avance) y la aplicación vacía sep_hero.
 #
 # Sep Hero (IEE2463, Proyecto 2). Basado en 03_vitis_build.tcl de la AYU10.
 #
@@ -25,11 +25,7 @@ if {[catch {platform list} plist] || [string first $PLAT $plist] < 0} {
     # Plataforma nueva: genera también el FSBL (necesario para el BOOT.bin, AC4).
     platform create -name $PLAT -hw $XSA -proc ps7_cortexa9_0 -os standalone
     domain active standalone_domain
-    # FatFs de Xilinx para la microSD (AC7): interfaz SD, lectura/escritura, nombres 8.3.
-    bsp setlib -name xilffs
-    bsp config fs_interface 1
-    bsp config read_only false
-    bsp config use_lfn 0
+    # Avance: sin microSD, el BSP no lleva xilffs.
     # Consola por la UART1 del PS (USB-UART de la Zybo).
     bsp config stdin  ps7_uart_1
     bsp config stdout ps7_uart_1

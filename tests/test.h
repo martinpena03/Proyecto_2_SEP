@@ -15,12 +15,9 @@ extern int g_checks;    /* comprobaciones hechas   */
     printf("FALLA %s:%d  %s\n", __FILE__, __LINE__, #cond); } } while (0)
 
 void test_engine(void);
-void test_joy(void);
 void test_formats(void);
 void test_audio_seq(void);
 void test_debcfg(void);
 void test_uart_cfg(void);
 void test_fsm(void);
-void test_render(void);
-
 #endif /* TEST_H */

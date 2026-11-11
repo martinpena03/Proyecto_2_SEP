@@ -11,10 +11,9 @@ int g_checks = 0;
 int main(void)
 {
     static const struct { const char *name; void (*fn)(void); } T[] = {
-        { "game_engine", test_engine },   { "joy_logic", test_joy },
-        { "sd_formats", test_formats },   { "audio_seq", test_audio_seq },
-        { "debcfg", test_debcfg },        { "uart_config", test_uart_cfg },
-        { "game_fsm", test_fsm },         { "render", test_render },
+        { "game_engine", test_engine },   { "sd_formats", test_formats },
+        { "audio_seq", test_audio_seq },  { "debcfg", test_debcfg },
+        { "uart_config", test_uart_cfg }, { "game_fsm", test_fsm },
     };
     unsigned i;
     for (i = 0; i < sizeof T / sizeof T[0]; i++) {

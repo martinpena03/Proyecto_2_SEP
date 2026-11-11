@@ -1,11 +1,10 @@
 /*
- * test_fsm.c - Tests de la máquina de estados y del render (manual §9.2 y §9.5).
+ * test_fsm.c - Tests de la máquina de estados (manual §9.2), versión avance.
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio.
  */
 #include <string.h>
 #include "test.h"
 #include "game_fsm.h"
-#include "../sim/fb.h"
 
 static GameCtx ctx;
 
@@ -15,7 +14,6 @@ static void frame(UiEvent ev)
     stub_advance(30);
     if (stub_song_running && ctx.gs.star_ms) ctx.gs.star_ms = (ctx.gs.star_ms > 30u) ? ctx.gs.star_ms - 30u : 0u;
     fsm_step(&ctx, ev);
-    render_frame(&ctx);
 }
 
 static void boot(void)
@@ -23,7 +21,6 @@ static void boot(void)
     memset(&ctx, 0, sizeof ctx);
     debcfg_default(&ctx.cfg);
     buzzer_init(&ctx.bz, 50);
-    fb_clear(0x1234);
     fsm_start(&ctx);
 }
 
@@ -60,11 +57,11 @@ void test_fsm(void)
     frame(UI_OK);    CHECK(ctx.st == ST_CONFIG && !ctx.bz.playing);
     frame(UI_BACK);  CHECK(ctx.st == ST_MENU && stub_deb_inits == 0);
     frame(UI_UP);    frame(UI_OK);  CHECK(ctx.st == ST_CONFIG);
-    stub_uart_feed("15\r\n5\r\n220\r\n900\r\n6\r\n");
+    stub_uart_feed("15\r\n5\r\n900\r\n6\r\n");
     frame(UI_NONE);
     CHECK(ctx.st == ST_MENU && stub_deb_inits == 1);
     CHECK(stub_deb_cfg.deb_ms == 15 && stub_deb_cfg.btn_mask == 5);     /* llegó al IP */
-    CHECK(stub_joy_umbral == 220 && stub_shake_mg == 900 && ctx.cfg.deb_ms == 15);
+    CHECK(stub_shake_mg == 900 && ctx.cfg.deb_ms == 15);
     CHECK(strstr(stub_uart_out, "IP: DEB_MS=15 BTN_MASK=0x5 LED_CTRL=0x06 (releidos del hardware)") != NULL);
     CHECK(strstr(stub_uart_out, "ESTADO: MENU") != NULL);
 
@@ -150,52 +147,4 @@ void test_fsm(void)
     /* Los récords guardados se recuperan al arrancar de nuevo. */
     boot();
     CHECK(ctx.n_rec == 1 && strcmp(ctx.rec[0].name, "BAZ") == 0);
-}
-
-void test_render(void)
-{
-    int i;
-    u32 worst = 0;
-    boot();
-    render_frame(&ctx);
-    CHECK(fb_oob == 0 && fb_pixels >= (u32)LCD_W * LCD_H);              /* INIT pinta todo */
-    for (i = 0; i < 51; i++) frame(UI_NONE);                            /* MENU */
-    CHECK(fb[0][0] == 0x0000);                                          /* tema oscuro: fondo negro */
-    fb_reset_stats();
-    frame(UI_NONE);
-    CHECK(fb_pixels == 0);                                              /* sin cambios no se dibuja */
-    stub_theme = THEME_LIGHT;                                           /* interrupción del OPT3001 */
-    frame(UI_NONE);
-    CHECK(fb[0][0] == 0xFFFF && fb_pixels >= (u32)LCD_W * LCD_H);       /* redibujo completo */
-    stub_theme = THEME_DARK;
-
-    /* Juego: tras el primer frame, cada frame envía pocos píxeles. */
-    frame(UI_OK);  frame(UI_OK);
-    CHECK(ctx.st == ST_PLAY);
-    frame(UI_NONE);
-    {
-        u16 next = 0;
-        while (ctx.st == ST_PLAY) {
-            while (next < ctx.song.n && ctx.song.chart[next].t_ms <= stub_song_ms + 30u) {
-                if (next % 7u != 3u) stub_push_hit((u8)ctx.song.chart[next].lane, ctx.song.chart[next].t_ms);
-                next++;
-            }
-            fb_reset_stats();
-            stub_crowd = (u8)((stub_song_ms / 100u) % 100u);
-            frame(UI_NONE);
-            if (ctx.st == ST_PLAY && fb_pixels > worst) worst = fb_pixels;
-            CHECK(fb_oob == 0);
-            if (fb_oob) break;
-        }
-    }
-    printf("  render: peor frame de juego = %lu pixeles (pantalla completa = %lu)\n",
-           (unsigned long)worst, (unsigned long)(LCD_W * LCD_H));
-    CHECK(worst < 5000u);                           /* ~25 ms de SPI a ~5 us por píxel */
-    for (i = 0; i < 200; i++) { frame(UI_NONE); CHECK(fb_oob == 0); }   /* GAME OVER */
-    frame(UI_OK);
-    /* Todas las pantallas restantes sin salirse del LCD. */
-    frame(UI_DOWN); frame(UI_OK); frame(UI_BACK);                       /* RECORDS */
-    frame(UI_DOWN); frame(UI_DOWN); frame(UI_OK); frame(UI_BACK);       /* CONFIG */
-    frame(UI_OK); frame(UI_OK); frame(UI_BACK); frame(UI_DOWN); frame(UI_NONE);   /* PAUSE */
-    CHECK(fb_oob == 0 && ctx.st == ST_PAUSE);
 }

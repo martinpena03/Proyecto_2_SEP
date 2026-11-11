@@ -1,5 +1,5 @@
 /*
- * test_logic.c - Tests de game_engine, joy_logic, sd_formats, audio_seq, debcfg y
+ * test_logic.c - Tests de game_engine, sd_formats, audio_seq, debcfg y
  * uart_config (docs/MANUAL_IMPLEMENTACION.md §9.1, §10.3 y §12.1).
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio.
  */
@@ -102,46 +102,6 @@ void test_engine(void)
     CHECK(gs.rcv_fx[0] == 0);
 }
 
-/* -------------------------------------------------------------- joy_logic */
-/* Repite la muestra hasta que el detector decide (espera JOY_SETTLE_N muestras). */
-static int jd(JoyDet *d, u16 x, u16 y)
-{
-    int i, r = -1;
-    for (i = 0; i <= (int)JOY_SETTLE_N && r < 0; i++) r = joy_detect(d, x, y);
-    return r;
-}
-
-void test_joy(void)
-{
-    JoyDet d;
-    joy_det_init(&d, 512, 512, 250, 0);
-    CHECK(joy_detect(&d, 900, 512) == -1);                 /* no decide al instante...   */
-    CHECK(joy_detect(&d, 600, 900) == -1 && joy_detect(&d, 560, 900) == -1);
-    CHECK(joy_detect(&d, 530, 900) == ARRIBA);             /* ...sino con la posicion final */
-    (void)jd(&d, 512, 512);
-    CHECK(jd(&d, 512, 512) == -1);                 /* centro */
-    CHECK(jd(&d, 700, 520) == -1);                 /* bajo el umbral */
-    CHECK(jd(&d, 900, 520) == DER);
-    CHECK(jd(&d, 900, 520) == -1);                 /* mantener no repite */
-    CHECK(jd(&d, 720, 512) == -1);                 /* dentro de la histéresis: sigue */
-    CHECK(jd(&d, 900, 512) == -1);
-    CHECK(jd(&d, 600, 512) == -1);                 /* bajo umbral - hist: rearma */
-    CHECK(jd(&d, 100, 512) == IZQ);
-    (void)jd(&d, 512, 512);
-    CHECK(jd(&d, 512, 900) == ARRIBA);
-    (void)jd(&d, 512, 512);
-    CHECK(jd(&d, 512, 100) == ABAJO);
-    (void)jd(&d, 512, 512);
-    CHECK(jd(&d, 900, 850) == DER);                /* diagonal: eje dominante X */
-    (void)jd(&d, 512, 512);
-    CHECK(jd(&d, 800, 100) == ABAJO);              /* diagonal: eje dominante Y */
-    /* Centro calibrado distinto de 512 y eje Y invertido. */
-    joy_det_init(&d, 500, 530, 250, 1);
-    CHECK(jd(&d, 500, 900) == ABAJO);
-    (void)jd(&d, 500, 530);
-    CHECK(jd(&d, 500, 150) == ARRIBA);
-}
-
 /* ------------------------------------------------------------- sd_formats */
 void test_formats(void)
 {
@@ -234,9 +194,9 @@ void test_debcfg(void)
     CHECK(debcfg_validate(NULL) == -1);
     c.deb_ms = 0;      CHECK(debcfg_validate(&c) == -2);   c.deb_ms = 255;
     c.btn_mask = 0;    CHECK(debcfg_validate(&c) == -3);
-    c.btn_mask = 2;    CHECK(debcfg_validate(&c) == -4);   c.btn_mask = 4;
-    CHECK(debcfg_validate(&c) == 0);
-    c.joy_umbral = 99; CHECK(debcfg_validate(&c) == -5);   c.joy_umbral = 450;
+    c.btn_mask = 2;    CHECK(debcfg_validate(&c) == -4);
+    c.btn_mask = 4;    CHECK(debcfg_validate(&c) == -4);   /* JOY_SEL no es OK */
+    c.btn_mask = 5;    CHECK(debcfg_validate(&c) == 0);
     c.umbral_shake = 2001; CHECK(debcfg_validate(&c) == -6);  c.umbral_shake = 800;
     c.led_pattern = 0;     CHECK(debcfg_validate(&c) == -7);
     c.led_pattern = 0x10;  CHECK(debcfg_validate(&c) == -7);
@@ -256,19 +216,20 @@ void test_uart_cfg(void)
     CHECK(uart_cfg_poll(&u, &out) == 0);                    /* sin datos: no bloquea */
     stub_uart_feed("15\r\n");
     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 1);
+    /* La pregunta de BTN_MASK es la más larga: debe salir completa (el buffer de
+     * prompt() se desbordó en la placa cuando medía 80). */
+    CHECK(strstr(stub_uart_out, "SEL=abajo] (actual 7): ") != NULL);
     stub_uart_feed("0x5\r");
     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 2);
-    stub_uart_feed("\n22");                                 /* '\n' suelto del par CR LF */
+    stub_uart_feed("\n52");                                 /* '\n' suelto del par CR LF */
     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 2 && u.len == 2);
-    stub_uart_feed("9\b0\r\n");                             /* 229 -> retroceso -> 220 */
+    stub_uart_feed("9\b0\r\n");                             /* 529 -> retroceso -> 520 */
     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 3);
-    stub_uart_feed("\r");                                   /* vacío: conserva 800 */
-    CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 4);
     stub_uart_feed("a\r");                                  /* patrón de LEDs en hex */
     CHECK(uart_cfg_poll(&u, &out) == 1);
-    CHECK(out.deb_ms == 15 && out.btn_mask == 5 && out.joy_umbral == 220 && out.umbral_shake == 800);
+    CHECK(out.deb_ms == 15 && out.btn_mask == 5 && out.umbral_shake == 520);
     CHECK(out.led_pattern == 0xA);
-    CHECK(strstr(stub_uart_out, "OK -> DEB_MS=15 BTN_MASK=0x5 JOY_UMBRAL=220 UMBRAL_SHAKE=800 mg LED_PATTERN=0xA") != NULL);
+    CHECK(strstr(stub_uart_out, "OK -> DEB_MS=15 BTN_MASK=0x5 UMBRAL_SHAKE=520 mg LED_PATTERN=0xA") != NULL);
 
     /* Valores inválidos: repite el paso. */
     stub_uart_out[0] = '\0';
@@ -278,11 +239,12 @@ void test_uart_cfg(void)
     stub_uart_feed("300\n");    CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 0);
     CHECK(strstr(stub_uart_out, "Valor fuera de rango") != NULL);
     stub_uart_feed("30\n2\n");  CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 1);   /* máscara sin OK */
+    stub_uart_feed("4\n");     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 1);   /* solo SEL: sin OK */
     stub_uart_feed("7\n99\n");  CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 2);
-    stub_uart_feed("300\n5000\n1500\n");
-    CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 4);
-    stub_uart_feed("0\n");     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 4);   /* patrón 0 no */
+    stub_uart_feed("5000\n1500\n");
+    CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 3);
+    stub_uart_feed("0\n");     CHECK(uart_cfg_poll(&u, &out) == 0 && u.step == 3);   /* patrón 0 no */
     stub_uart_feed("3\n");
-    CHECK(uart_cfg_poll(&u, &out) == 1 && out.deb_ms == 30 && out.joy_umbral == 300 && out.umbral_shake == 1500);
+    CHECK(uart_cfg_poll(&u, &out) == 1 && out.deb_ms == 30 && out.umbral_shake == 1500);
     CHECK(out.led_pattern == 3);
 }

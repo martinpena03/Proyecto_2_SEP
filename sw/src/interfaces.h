@@ -4,7 +4,9 @@
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: diseño propio (docs/MANUAL_IMPLEMENTACION.md §7.4).
  *
- * Regla de portabilidad: game_engine.c, game_fsm.c, render.c, text.c, joy_logic.c,
+ * VERSION AVANCE (sin pantalla, joystick, micrófono ni microSD).
+ *
+ * Regla de portabilidad: game_engine.c, game_fsm.c,
  * audio_seq.c, sd_formats.c, debouncer_logic.c y uart_config.c solo usan funciones
  * declaradas aquí, nunca drivers de Xilinx. Así se compilan y prueban en el PC
  * (tests/ y sim/) contra los stubs de tests/stubs.c.
@@ -24,7 +26,6 @@
 typedef struct {
     u16 deb_ms;        /* tiempo de antirrebote [ms]            -> IP (reg DEB_MS)   */
     u8  btn_mask;      /* bit0 S1, bit1 S2, bit2 JOY_SEL        -> IP (reg BTN_MASK) */
-    u16 joy_umbral;    /* umbral de dirección del joystick      -> input.c           */
     u16 umbral_shake;  /* umbral del acelerómetro [mg]          -> sensors.c         */
     u8  led_pattern;   /* LEDs LD3..LD0 en modo claro [1-F]     -> IP (reg LED_CTRL) */
 } DebCfg;
@@ -47,14 +48,12 @@ u8   debouncer_led_readback(const Debouncer *dev);     /* LED_CTRL releído: [4]
 /* debouncer_logic.c (portable): validación y valores por defecto. */
 #define DEB_MS_MIN        1u
 #define DEB_MS_MAX        255u
-#define JOY_UMBRAL_MIN    100u
-#define JOY_UMBRAL_MAX    450u
 #define SHAKE_MG_MIN      200u
 #define SHAKE_MG_MAX      2000u
 #define LED_PAT_MIN       1u
 #define LED_PAT_MAX       0xFu
 int  debcfg_validate(const DebCfg *c);             /* 0 = válida */
-void debcfg_default(DebCfg *c);                    /* 20 ms, 0x7, 250, 800 mg, 0xF */
+void debcfg_default(DebCfg *c);                    /* 20 ms, 0x7, 800 mg, 0xF */
 
 /* ====================================================================== */
 /* UART (AO3: configuración desde la consola del PC)                      */
@@ -66,7 +65,7 @@ void uart_hal_puts(const char *s);
 
 /* uart_config.c (portable): lector de línea no bloqueante + parser. */
 typedef struct {
-    u8     step;       /* 0..4: DEB_MS, BTN_MASK, JOY_UMBRAL, UMBRAL_SHAKE, LED_PATTERN */
+    u8     step;       /* 0..3: DEB_MS, BTN_MASK, UMBRAL_SHAKE, LED_PATTERN */
     u8     len;        /* caracteres acumulados en line[]                  */
     u8     last_eol;   /* último fin de línea visto ('\r' o '\n'; 0 = otro) */
     char   line[24];
@@ -88,25 +87,10 @@ void clock_song_set(u32 ms);
 void clock_song_run(int run);
 
 /* ====================================================================== */
-/* Entradas: joystick y botones (input.c no portable, joy_logic.c portable) */
+/* Entradas: botones de la Booster vía debouncer_axi (input.c, no portable) */
 /* ====================================================================== */
-
-/* joy_logic.c: detector de dirección con eje dominante e histéresis. */
-typedef enum { JS_CENTER = 0, JS_HELD = 1, JS_SETTLE = 2 } JoyPhase;
-typedef struct {
-    JoyPhase ph;        /* centro o dirección mantenida            */
-    Lane     dir;       /* última dirección detectada              */
-    u16      umbral;    /* desviación mínima para "dirección"      */
-    s16      x0, y0;    /* centro calibrado                        */
-    u8       inv_y;     /* 1 = invertir el signo del eje Y         */
-    u8       settle;    /* muestras que faltan para decidir        */
-} JoyDet;
-void joy_det_init(JoyDet *d, u16 x0, u16 y0, u16 umbral, u8 inv_y);
-int  joy_detect(JoyDet *d, u16 x, u16 y);   /* Lane recién activada o -1 */
-
 /* input.c */
 void    input_set_play_mode(int play);    /* 1 = JUEGO (flechas -> Hit); 0 = menús */
-void    input_set_joy_umbral(u16 umbral);
 int     hit_pop(Hit *out);                /* 0 = cola vacía */
 UiEvent ui_pop(void);
 void    input_flush(void);                /* vacía ambas colas */
@@ -115,7 +99,7 @@ void    input_flush(void);                /* vacía ambas colas */
 /* Sensores: acelerómetro y micrófono (sensors.c, no portable)            */
 /* ====================================================================== */
 void sensors_set_shake_threshold(u16 mg);
-u8   sensors_crowd_level(void);           /* 0..100 a partir del micrófono */
+u8   sensors_crowd_level(void);           /* sin micrófono en el avance: 0 */
 
 /* ====================================================================== */
 /* Sensor de luz y tema (opt3001.c, theme.c; no portables)                */
@@ -200,16 +184,5 @@ typedef enum {
 typedef struct GameCtx GameCtx;   /* definido en game_fsm.h */
 void fsm_start(GameCtx *ctx);
 void fsm_step(GameCtx *ctx, UiEvent ev);
-
-/* ====================================================================== */
-/* Pantalla (render.c y text.c portables; lcd_fast.c no portable)         */
-/* ====================================================================== */
-void render_frame(const GameCtx *ctx);
-
-/* lcd_fast.c: en el simulador del PC escriben en un framebuffer. */
-#define LCD_W 128u
-#define LCD_H 128u
-void lcd_fill(u16 x0, u16 y0, u16 x1, u16 y1, u16 color);    /* x1, y1 exclusivos    */
-void lcd_blit(u16 x, u16 y, u16 w, u16 h, const u16 *pix);   /* RGB565, fila a fila  */
 
 #endif /* INTERFACES_H */

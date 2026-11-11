@@ -43,12 +43,10 @@ typedef int32_t  s32;
 #define SONG_TAIL_MS      2000u    /* margen tras la última nota para declarar el fin    */
 #define NOTE_LOOKAHEAD_MS 1500u    /* tiempo que tarda una nota en recorrer la pista     */
 
-#define JOY_TICK_MS       2u       /* periodo de axi_timer_1 (muestreo del joystick)     */
-#define SENS_DIV          5u       /* acelerómetro y micrófono cada 5 ticks = 10 ms      */
-#define FRAME_DIV         15u      /* frame cada 15 ticks = 30 ms (~33 FPS)              */
-#define JOY_UMBRAL_DEF    180u     /* desviación (cuentas de 10 bits) para "dirección"   */
-#define JOY_HIST          60u      /* vuelve a centro bajo JOY_UMBRAL - JOY_HIST         */
-#define JOY_SETTLE_N      3u       /* muestras de espera antes de decidir la dirección   */
+#define TICK1_MS          2u       /* periodo de axi_timer_1                             */
+#define SENS_DIV          5u       /* acelerómetro cada 5 ticks = 10 ms                  */
+#define FRAME_DIV         15u      /* paso de la FSM cada 15 ticks = 30 ms               */
+#define OPT_POLL_DIV      100u     /* OPT3001 cada 100 ticks = 200 ms                    */
 #define HIT_Q_LEN         16u      /* cola de golpes (potencia de 2)                     */
 #define UI_Q_LEN          8u       /* cola de eventos de interfaz (potencia de 2)        */
 

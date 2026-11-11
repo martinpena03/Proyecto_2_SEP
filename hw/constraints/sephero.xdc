@@ -7,12 +7,6 @@
 ## Los nombres de puerto coinciden con los de design_1_wrapper.
 ## =============================================================================
 
-## ---- LCD ST7735S (Pmod JE): axi_quad_spi_0 + axi_gpio_0 - igual que LAB10/AYU11
-set_property -dict { PACKAGE_PIN V12 IOSTANDARD LVCMOS33 } [get_ports { RS_tri_o[0] }];   # JE1  DC/RS
-set_property -dict { PACKAGE_PIN W16 IOSTANDARD LVCMOS33 } [get_ports { CS[0] }];         # JE2  CS
-set_property -dict { PACKAGE_PIN J15 IOSTANDARD LVCMOS33 } [get_ports { MOSI }];          # JE3  MOSI
-set_property -dict { PACKAGE_PIN H15 IOSTANDARD LVCMOS33 } [get_ports { RST_tri_o[0] }];  # JE4  RST
-set_property -dict { PACKAGE_PIN V13 IOSTANDARD LVCMOS33 } [get_ports { SCLK }];          # JE7  SCLK
 
 ## ---- ADC SPI de la tarjeta de extensión (Pmod JC): axi_quad_spi_1 - igual que LAB10
 set_property -dict { PACKAGE_PIN W14 IOSTANDARD LVCMOS33 } [get_ports { spi_rtl_io1_io }];    # JC7  MISO
@@ -32,10 +26,6 @@ set_property -dict { PACKAGE_PIN T14 IOSTANDARD LVCMOS33 } [get_ports { BUZZER_P
 set_property -dict { PACKAGE_PIN T15 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_in[0] }];  # JD2 S1
 set_property -dict { PACKAGE_PIN P14 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_in[1] }];  # JD3 S2
 set_property -dict { PACKAGE_PIN R14 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_in[2] }];  # JD4 JOY_SEL
-
-## ---- INT del OPT3001 (open-drain, activo en bajo) -> axi_gpio_1
-## El pin se agrega aquí una vez identificado con el buscador de pin
-## (hw/scripts/02_build_bd.tcl en modo "finder"; ver docs/MANUAL_IMPLEMENTACION.md §15.1).
 
 ## ---- LEDs LD0..LD3 de la Zybo <- debouncer_axi_0/leds (indicador del modo claro)
 set_property -dict { PACKAGE_PIN M14 IOSTANDARD LVCMOS33 } [get_ports { leds[0] }];  # LD0

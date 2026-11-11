@@ -9,12 +9,12 @@
  * Portable: solo usa uart_hal_getc() / uart_hal_puts() (uart_hal.c en la placa, stubs
  * en el PC). No usa printf ni scanf.
  *
- * El usuario entrega 5 parámetros: DEB_MS, BTN_MASK y LED_PATTERN (van al IP propio por
- * debouncer_init), JOY_UMBRAL (input.c) y UMBRAL_SHAKE (sensors.c).
+ * El usuario entrega 4 parámetros: DEB_MS, BTN_MASK y LED_PATTERN (van al IP propio por
+ * debouncer_init) y UMBRAL_SHAKE (sensors.c).
  */
 #include "interfaces.h"
 
-#define N_STEPS 5u
+#define N_STEPS 4u
 
 /* ----------------------- utilidades de formato (sin printf) ----------------------- */
 
@@ -51,7 +51,7 @@ char *fmt_hex(char *dst, u32 v, u8 digits)
 /* Imprime la pregunta del paso actual con el valor vigente. */
 static void prompt(const UartCfg *u)
 {
-    char b[80];
+    char b[160];                     /* la pregunta más larga (BTN_MASK) mide ~95 */
     char *p = b;
     switch (u->step) {
     case 0:
@@ -59,14 +59,10 @@ static void prompt(const UartCfg *u)
         p = fmt_u32(p, u->tmp.deb_ms);
         break;
     case 1:
-        p = fmt_str(p, "BTN_MASK [hex 1-7: bit0 S1, bit1 S2, bit2 SEL] (actual ");
+        p = fmt_str(p, "BTN_MASK [hex 1-7, con bit0: bit0 S1=OK, bit1 S2=atras, bit2 SEL=abajo] (actual ");
         p = fmt_hex(p, u->tmp.btn_mask, 1);
         break;
     case 2:
-        p = fmt_str(p, "JOY_UMBRAL [100-450] (actual ");
-        p = fmt_u32(p, u->tmp.joy_umbral);
-        break;
-    case 3:
         p = fmt_str(p, "UMBRAL_SHAKE [mg 200-2000] (actual ");
         p = fmt_u32(p, u->tmp.umbral_shake);
         break;
@@ -106,21 +102,17 @@ static int accept_line(UartCfg *u)
     u32 v = 0;
     u->line[u->len] = '\0';
     if (u->len == 0u) return 1;                       /* línea vacía: conserva el valor */
-    if (parse_num(u->line, u->step == 1u || u->step == 4u, &v) != 0) return 0;
+    if (parse_num(u->line, u->step == 1u || u->step == 3u, &v) != 0) return 0;
     switch (u->step) {
     case 0:
         if (v < DEB_MS_MIN || v > DEB_MS_MAX) return 0;
         u->tmp.deb_ms = (u16)v;
         break;
     case 1:
-        if (v < 1u || v > 7u || (v & 0x5u) == 0u) return 0;   /* hace falta S1 o SEL */
+        if (v < 1u || v > 7u || (v & 0x1u) == 0u) return 0;   /* hace falta S1 (OK) */
         u->tmp.btn_mask = (u8)v;
         break;
     case 2:
-        if (v < JOY_UMBRAL_MIN || v > JOY_UMBRAL_MAX) return 0;
-        u->tmp.joy_umbral = (u16)v;
-        break;
-    case 3:
         if (v < SHAKE_MG_MIN || v > SHAKE_MG_MAX) return 0;
         u->tmp.umbral_shake = (u16)v;
         break;
@@ -174,7 +166,6 @@ int uart_cfg_poll(UartCfg *u, DebCfg *out)
                 }
                 p = fmt_str(p, "OK -> DEB_MS=");       p = fmt_u32(p, u->tmp.deb_ms);
                 p = fmt_str(p, " BTN_MASK=0x");        p = fmt_hex(p, u->tmp.btn_mask, 1);
-                p = fmt_str(p, " JOY_UMBRAL=");        p = fmt_u32(p, u->tmp.joy_umbral);
                 p = fmt_str(p, " UMBRAL_SHAKE=");      p = fmt_u32(p, u->tmp.umbral_shake);
                 p = fmt_str(p, " mg LED_PATTERN=0x");  p = fmt_hex(p, u->tmp.led_pattern, 1);
                 p = fmt_str(p, "\r\n");
