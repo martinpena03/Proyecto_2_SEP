@@ -8,8 +8,8 @@
 CC      := gcc
 CFLAGS  := -std=c99 -Wall -Wextra -g -I../sw/src -I../sw/src/lib
 SRC     := ../sw/src
-PORTABLE := game_engine.c game_fsm.c audio_seq.c sd_formats.c \
-            song_embedded.c debouncer_logic.c uart_config.c
+PORTABLE := game_manager.c state_machine.c sound_manager.c sd_manager_formats.c \
+            sd_manager_songs.c debouncer_ip_logic.c uart_config.c
 COMMON  := $(addprefix $(SRC)/,$(PORTABLE)) stubs.c
 BUILD   := build
 

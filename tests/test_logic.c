@@ -1,5 +1,5 @@
 /*
- * test_logic.c - Tests de game_engine, sd_formats, audio_seq, debcfg y
+ * test_logic.c - Tests de game_manager, sd_manager_formats, sound_manager, debcfg y
  * uart_config (docs/MANUAL_IMPLEMENTACION.md §9.1, §10.3 y §12.1).
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio.
  */

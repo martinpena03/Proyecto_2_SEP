@@ -1,5 +1,5 @@
 /*
- * song_embedded.c - Charts embebidos (respaldo cuando no hay microSD).
+ * sd_manager_songs.c - Charts embebidos (respaldo cuando no hay microSD).
  *
  * ARCHIVO GENERADO por tools/shc2c.py desde sd_card/SONGn.SHC: no editar a mano.
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.

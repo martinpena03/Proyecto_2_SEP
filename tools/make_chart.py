@@ -22,7 +22,7 @@ Reglas de jugabilidad (hay que volver al centro entre dos golpes del mismo carri
     - si dos notas seguidas del mismo carril quedan a menos de MIN_SAME_LANE_MS, la
       segunda se mueve igual.
 
-Formato del archivo: ver sw/src/sd_formats.c.
+Formato del archivo: ver sw/src/sd_manager_formats.c.
 
 Uso:  python tools/make_chart.py          (escribe sd_card/SONG1.SHC y sd_card/SONG2.SHC)
 """

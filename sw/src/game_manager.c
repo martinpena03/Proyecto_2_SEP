@@ -1,5 +1,5 @@
 /*
- * game_engine.c - Reglas del juego (Game Manager, AC2).
+ * game_manager.c - Reglas del juego (Game Manager, AC2).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (SepHero_BD.pdf páginas 1 y 3, docs/MANUAL_IMPLEMENTACION.md §9.1).

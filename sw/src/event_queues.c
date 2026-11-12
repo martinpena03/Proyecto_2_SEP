@@ -1,10 +1,11 @@
 /*
- * input.c - Colas de eventos y botones filtrados por el IP propio (VERSION AVANCE).
+ * event_queues.c - Colas de eventos entre las ISR y main (VERSION AVANCE).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
- * (docs/MANUAL_IMPLEMENTACION.md §8.3). En el avance no hay joystick: los eventos de la
- * máquina de estados llegan de los botones de la Booster (S1, S2, JOY_SEL) a través de
- * debouncer_axi, o del teclado del PC (console.c).
+ * (docs/MANUAL_IMPLEMENTACION.md §8.3). No es un bloque del diagrama: es el transporte
+ * de Btn_edges hacia State_Machine. En el avance no hay joystick: los eventos llegan de
+ * los botones de la Booster (S1, S2, JOY_SEL) a través de Debouncer_IP (la ISR está en
+ * isr_handler.c) o del teclado del PC (uart_console.c).
  *
  * Colas circulares SPSC (un productor = ISR, un consumidor = main), de tamaño potencia
  * de 2 e índices volatile: no hace falta deshabilitar interrupciones para consumirlas.
@@ -63,15 +64,3 @@ void input_flush(void)
  * se conservan por la interfaz de la máquina de estados (portable). */
 void input_set_play_mode(int play)      { (void)play; }
 void input_mute_hits_until(u32 sys_ms)  { (void)sys_ms; }
-
-/* ------------------------------ botones (IP) ------------------------------ */
-/* Interrupción del IP propio: lee los flancos ya filtrados y los borra (W1C).
- * S1 = OK, S2 = atrás / pausa, JOY_SEL = abajo (recorre los menús sin joystick). */
-void deb_isr(void *ref)
-{
-    GameCtx *ctx = (GameCtx *)ref;
-    u8 e = debouncer_get_edges(&ctx->deb);
-    if (e & 0x1u) ui_push(UI_OK);        /* S1      */
-    if (e & 0x2u) ui_push(UI_BACK);      /* S2      */
-    if (e & 0x4u) ui_push(UI_DOWN);      /* JOY_SEL */
-}

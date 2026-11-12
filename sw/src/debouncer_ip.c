@@ -1,5 +1,5 @@
 /*
- * debouncer_axi.c - Driver del IP propio debouncer_axi (AO3).
+ * debouncer_ip.c - Driver del IP propio debouncer_axi (AO3).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: diseño propio (docs/MANUAL_IMPLEMENTACION.md §8.2); acceso a registros con
@@ -15,7 +15,7 @@
 #include "xparameters.h"
 #include "interfaces.h"
 
-#define DEB_BASE      XPAR_DEBOUNCER_AXI_0_BASEADDR
+#define DEB_BASE      XPAR_DEBOUNCER_IP_BASEADDR
 #define DEB_CTRL      0x00u
 #define DEB_DEB_MS    0x04u
 #define DEB_BTNMASK   0x08u

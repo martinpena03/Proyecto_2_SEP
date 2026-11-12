@@ -5,7 +5,8 @@ Proyecto 2 de IEE2463 Sistemas Electrónicos Programables (PUC). Es un juego tip
 la PL (Vivado 2020.1).
 
 - **Reparto de trabajo, hitos y flujo de GitHub:** [`docs/PLAN_TRABAJO.md`](docs/PLAN_TRABAJO.md)
-- **Diagrama de bloques:** [`docs/diagramas/SepHero_BD.pdf`](docs/diagramas/SepHero_BD.pdf) (fuente `.drawio` al lado)
+- **Versión de avance (esta rama):** [`docs/AVANCE.md`](docs/AVANCE.md)
+- **Diagrama de bloques:** [`docs/diagramas/Diagrama_de_bloques_02_01.pdf`](docs/diagramas/Diagrama_de_bloques_02_01.pdf); los nombres de bloques, señales y archivos lo siguen ([`docs/NOMBRES_DIAGRAMA.md`](docs/NOMBRES_DIAGRAMA.md))
 - **Enunciado y rúbricas:** repositorio del curso [IEE2463-SEP/PROY02](https://github.com/IEE2463-SEP/PROY02)
 
 ## Estructura
@@ -22,7 +23,7 @@ sw/src/          código C de la aplicación Vitis
   interfaces.h   contrato entre A y B (firmas de todos los módulos)
   lib/           drivers del curso (LCD, ADC, I2C), citados en el informe
 tests/           tests en el PC de la lógica portable (gcc) + stubs del hardware
-sim/             simulador de render.c en el PC (genera .ppm)            [B]
+sim/             simulador de screen_manager.c en el PC (genera .ppm)            [B]
 tools/           scripts (generador de SONG1.SHC, conversor de imágenes)  [B]
 boot/            BOOT.BIN, .bif y pasos del boot desde la SD             [A]
 sd_card/         archivos que van a la raíz de la microSD (SONG1.SHC, RECORDS.TXT)

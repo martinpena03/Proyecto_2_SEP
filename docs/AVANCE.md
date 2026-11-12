@@ -7,6 +7,9 @@ está en la rama `proyecto-final`.
 
 ## Bloques y conexiones
 
+Los nombres siguen [`Diagrama_de_bloques_02_01`](diagramas/Diagrama_de_bloques_02_01.pdf);
+la correspondencia bloque → archivo está en [`NOMBRES_DIAGRAMA.md`](NOMBRES_DIAGRAMA.md).
+
 | Bloque | Conexión | Uso en el avance |
 |---|---|---|
 | PS7 (ARM) | UART1, QSPI (boot), TTC0 → EMIO → `BUZZER_PWM` (T14, JD1) | consola, melodía del menú |
@@ -14,7 +17,7 @@ está en la rama `proyecto-final`.
 | `axi_timer_1` | IRQ → GIC 62, 2 ms | acelerómetro cada 10 ms, OPT3001 cada 200 ms, paso de la FSM cada 30 ms |
 | `axi_quad_spi_1` | Pmod JC (ADC de la tarjeta de extensión) | acelerómetro X, Y, Z |
 | `axi_iic_0` | Pmod JD9/JD10 (SCL/SDA) | OPT3001 (0x44) |
-| `debouncer_axi_0` (IP propio) | `btn_in` = S1, S2, JOY_SEL (JD2–JD4); `leds` = LD0–LD3; IRQ → GIC 63 | botones filtrados y LEDs del modo claro |
+| `Debouncer_IP` (IP propio) | `btn_raw[2:0]` = S1, S2, JOY_SEL (JD2–JD4); `leds` = LD0–LD3; `irq_deb` → GIC 63 | botones filtrados y LEDs del modo claro |
 
 Se quitaron `axi_quad_spi_0` y `axi_gpio_0` (LCD), `axi_gpio_1` (el INT del OPT3001 no
 llega a la Zybo), VIO, ILA y la SD0 del PS.
@@ -57,11 +60,21 @@ llega a la Zybo), VIO, ILA y la SD0 del PS.
 
 ## Construcción
 
+El hardware ya viene exportado en `hw/export/sephero.xsa` (con bitstream); Vivado solo hace
+falta si se cambia el block design.
+
 ```bash
-vivado -mode batch -source hw/scripts/02_build_bd.tcl
-xsct sw/scripts/vitis_platform.tcl
+vivado -mode batch -source hw/scripts/02_build_bd.tcl   # opcional: regenera el .xsa
+xsct sw/scripts/vitis_platform.tcl    # plataforma + app sep_hero con sw/src enlazada
 sh sw/scripts/build_app.sh debug      # buzzer en mudo
 sh sw/scripts/build_app.sh sound      # con sonido
 xsct sw/scripts/run_on_board.tcl Sound
 make -C tests run                     # lógica portable en el PC
 ```
+
+**Desde la GUI de Vitis 2020.1:** después de `vitis_platform.tcl`, abrir Vitis con el
+workspace `sw/workspace` de esta rama (en `File > Switch Workspace > Other...`). La app
+`sep_hero` muestra el código en `src/sw_src` (es `sw/src` enlazada). Compilar con el martillo
+y cargar con `Run As > Launch on Hardware (System Debugger)`, con el jumper JP5 en JTAG y un
+terminal serial en el COM de la Zybo a 115200 8N1. Ojo: la build de la GUI tiene el buzzer
+habilitado.

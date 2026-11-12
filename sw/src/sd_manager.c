@@ -1,10 +1,10 @@
 /*
- * song_store.c - Canciones y récords del avance (sin microSD).
+ * sd_manager.c - Canciones y récords del avance (sin microSD).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio; reemplaza a
- *   sd_storage.c del proyecto completo (rama proyecto-final), que usa la microSD.
+ *   sd_manager.c del proyecto completo (rama proyecto-final), que usa la microSD.
  *
- * Implementa la interfaz sd_* de interfaces.h con los charts embebidos (song_embedded.c,
+ * Implementa la interfaz sd_* de interfaces.h con los charts embebidos (sd_manager_songs.c,
  * generados por tools/shc2c.py) y los récords solo en RAM.
  */
 #include "xil_printf.h"

@@ -1,5 +1,5 @@
 /*
- * game_fsm.c - Máquina de estados del juego (State_Machine, AC1).
+ * state_machine.c - Máquina de estados del juego (State_Machine, AC1).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (SepHero_BD.pdf página 3, docs/MANUAL_IMPLEMENTACION.md §9.2 y §9.3).
@@ -13,7 +13,7 @@
  * Las flechas del juego no llegan como eventos: se leen de la cola de golpes (hit_pop).
  * El tema claro/oscuro cambia en paralelo a todos los estados (interrupción del OPT3001).
  */
-#include "game_fsm.h"
+#include "state_machine.h"
 
 /* -------------------------------------------------------------------------- */
 /* Apoyo                                                                      */

@@ -1,5 +1,5 @@
 /*
- * opt3001.c - Sensor de luz OPT3001 por I2C: registros y ventana de comparación.
+ * light_aconditioner.c - Sensor de luz OPT3001 por I2C: registros y ventana de comparación.
  * theme_*  - Tema claro / oscuro gobernado por la interrupción del sensor.
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.

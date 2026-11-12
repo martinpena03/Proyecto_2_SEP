@@ -9,7 +9,7 @@
 #
 # VERSION AVANCE (rama avance-p2): solo las conexiones del avance.
 #   PS7 (UART1, QSPI, TTC0 -> EMIO -> buzzer) + axi_timer_0/1 + axi_quad_spi_1 (ADC:
-#   acelerometro) + axi_iic_0 (OPT3001) + debouncer_axi_0 (botones S1/S2/JOY_SEL y
+#   acelerometro) + axi_iic_0 (OPT3001) + Debouncer_IP (botones S1/S2/JOY_SEL y
 #   LEDs LD0..LD3 del modo claro). Sin LCD, joystick, microfono, microSD, VIO/ILA ni
 #   axi_gpio_1 (el INT del OPT3001 no llega a la Zybo). El proyecto completo esta en la
 #   rama proyecto-final.
@@ -88,7 +88,7 @@ set_property CONFIG.IIC_FREQ_KHZ {100} $iic
 
 
 # M02: IP propio (AO3).
-set deb [create_bd_cell -type ip -vlnv uc.cl:sephero:debouncer_axi:1.0 debouncer_axi_0]
+set deb [create_bd_cell -type ip -vlnv uc.cl:sephero:debouncer_axi:1.0 Debouncer_IP]
 set_property -dict [list CONFIG.G_WIDTH {3} CONFIG.G_TICKS_PER_MS {50000}] $deb
 
 # M03 / M04: timers (solo el timer 0 de cada IP, 32 bits).
@@ -108,7 +108,7 @@ connect_bd_intf_net [get_bd_intf_pins processing_system7_0/M_AXI_GP0] [get_bd_in
 set slaves {
     axi_quad_spi_1/AXI_LITE
     axi_iic_0/S_AXI
-    debouncer_axi_0/s00_axi
+    Debouncer_IP/s00_axi
     axi_timer_1/S_AXI
     axi_timer_0/S_AXI
 }
@@ -127,12 +127,12 @@ set clk_pins [list \
     axi_quad_spi_1/s_axi_aclk axi_quad_spi_1/ext_spi_clk \
     axi_iic_0/s_axi_aclk \
     axi_timer_0/s_axi_aclk axi_timer_1/s_axi_aclk \
-    debouncer_axi_0/s00_axi_aclk]
+    Debouncer_IP/s00_axi_aclk]
 set rst_pins [list \
     ps7_0_axi_periph/S00_ARESETN \
     axi_quad_spi_1/s_axi_aresetn axi_iic_0/s_axi_aresetn \
     axi_timer_0/s_axi_aresetn axi_timer_1/s_axi_aresetn \
-    debouncer_axi_0/s00_axi_aresetn]
+    Debouncer_IP/s00_axi_aresetn]
 for {set i 0} {$i < 5} {incr i} {
     lappend clk_pins ps7_0_axi_periph/M0${i}_ACLK
     lappend rst_pins ps7_0_axi_periph/M0${i}_ARESETN
@@ -149,10 +149,10 @@ connect_bd_net [get_bd_pins rst_ps7_0_50M/interconnect_aresetn] [get_bd_pins ps7
 # ----------------------------------------------------------------------------
 # Interrupciones: xlconcat_0 -> IRQ_F2P[2:0] (ID del GIC 61..63)
 # ----------------------------------------------------------------------------
-connect_bd_net [get_bd_pins axi_timer_0/interrupt]      [get_bd_pins xlconcat_0/In0]   ;# 61: 1 ms
-connect_bd_net [get_bd_pins axi_timer_1/interrupt]      [get_bd_pins xlconcat_0/In1]   ;# 62: 2 ms
-connect_bd_net [get_bd_pins debouncer_axi_0/irq]        [get_bd_pins xlconcat_0/In2]   ;# 63: botones
-connect_bd_net [get_bd_pins xlconcat_0/dout]            [get_bd_pins processing_system7_0/IRQ_F2P]
+connect_bd_net -net irq_t0 [get_bd_pins axi_timer_0/interrupt]      [get_bd_pins xlconcat_0/In0]   ;# 61: 1 ms
+connect_bd_net -net irq_t1 [get_bd_pins axi_timer_1/interrupt]      [get_bd_pins xlconcat_0/In1]   ;# 62: 2 ms
+connect_bd_net -net irq_deb [get_bd_pins Debouncer_IP/irq]        [get_bd_pins xlconcat_0/In2]   ;# 63: botones
+connect_bd_net -net IRQ_F2P [get_bd_pins xlconcat_0/dout]            [get_bd_pins processing_system7_0/IRQ_F2P]
 
 # ----------------------------------------------------------------------------
 # Puertos externos
@@ -165,15 +165,15 @@ connect_bd_intf_net [get_bd_intf_ports iic_rtl] [get_bd_intf_pins axi_iic_0/IIC]
 
 # Buzzer: PWM del TTC0 del PS, ruteado por EMIO.
 create_bd_port -dir O BUZZER_PWM
-connect_bd_net [get_bd_ports BUZZER_PWM] [get_bd_pins processing_system7_0/TTC0_WAVE0_OUT]
+connect_bd_net -net TTC0_WAVE0_OUT [get_bd_ports BUZZER_PWM] [get_bd_pins processing_system7_0/TTC0_WAVE0_OUT]
 
 # Botones de la Booster -> IP propio.
-create_bd_port -dir I -from 2 -to 0 btn_in
-connect_bd_net [get_bd_ports btn_in] [get_bd_pins debouncer_axi_0/btn_in]
+create_bd_port -dir I -from 2 -to 0 btn_raw
+connect_bd_net -net btn_raw [get_bd_ports btn_raw] [get_bd_pins Debouncer_IP/btn_in]
 
 # LEDs LD0..LD3 de la Zybo <- IP propio (indicador del modo claro).
 create_bd_port -dir O -from 3 -to 0 leds
-connect_bd_net [get_bd_ports leds] [get_bd_pins debouncer_axi_0/leds]
+connect_bd_net [get_bd_ports leds] [get_bd_pins Debouncer_IP/leds]
 
 
 # ----------------------------------------------------------------------------
@@ -188,7 +188,7 @@ sephero_addr axi_iic_0/S_AXI/Reg           0x41600000
 sephero_addr axi_quad_spi_1/AXI_LITE/Reg   0x41E10000
 sephero_addr axi_timer_0/S_AXI/Reg         0x42800000
 sephero_addr axi_timer_1/S_AXI/Reg         0x42810000
-sephero_addr debouncer_axi_0/s00_axi/*     0x43C00000
+sephero_addr Debouncer_IP/s00_axi/*     0x43C00000
 
 regenerate_bd_layout
 validate_bd_design

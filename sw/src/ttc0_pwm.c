@@ -1,5 +1,5 @@
 /*
- * audio.c - PWM del buzzer con el TTC0 del PS, ruteado por EMIO (AC6).
+ * ttc0_pwm.c - PWM del buzzer con el TTC0 del PS, ruteado por EMIO (AC6).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: técnica de la cápsula "Buzzer Proyecto 2" del curso (opción A: TTC0 en modo
@@ -7,7 +7,7 @@
  *   match > intervalo) sobre el driver XTtcPs del BSP; implementación propia
  *   (docs/MANUAL_IMPLEMENTACION.md §8.6). No usa VHDL: el PWM lo genera el PS.
  *
- * buzzer_tone() lo llama el secuenciador (audio_seq.c) desde la interrupción de 1 ms,
+ * buzzer_tone() lo llama el secuenciador (sound_manager.c) desde la interrupción de 1 ms,
  * solo cuando cambia la nota.
  *
  * MUDO (SEP_MUTE o audio_set_mute(1)): el contador del TTC queda detenido y con la

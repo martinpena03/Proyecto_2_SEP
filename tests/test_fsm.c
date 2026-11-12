@@ -4,7 +4,7 @@
  */
 #include <string.h>
 #include "test.h"
-#include "game_fsm.h"
+#include "state_machine.h"
 
 static GameCtx ctx;
 

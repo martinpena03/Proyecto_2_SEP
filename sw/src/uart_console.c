@@ -1,9 +1,9 @@
 /*
- * console.c - Consola del avance por la UART (115200 8N1): la máquina de estados se
+ * uart_console.c - Consola del avance por la UART (115200 8N1): la máquina de estados se
  *             representa y se maneja desde el PC, sin pantalla.
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio, reducido de
- *   la consola de diagnóstico del proyecto completo (rama proyecto-final, diag.c).
+ *   la consola de diagnóstico del proyecto completo (rama proyecto-final, uart_console.c).
  *
  * Teclas: 1 OK (como S1)   2 atrás/pausa (como S2)   u arriba   j abajo (como JOY_SEL)
  *         k sacudida virtual   p autoplay (juega solo la canción)
@@ -40,7 +40,7 @@ static void help(void)
     xil_printf("\r\n--- consola del avance Sep Hero ---\r\n"
                " 1 OK (S1)   2 atras/pausa (S2)   u arriba   j abajo (JOY_SEL)\r\n"
                " k sacudida virtual   p autoplay on/off (en PLAY)\r\n"
-               " s estado   o sensor de luz   d IP debouncer_axi   t interrupciones   T buzzer\r\n");
+               " s estado   o sensor de luz   d IP Debouncer_IP   t interrupciones   T buzzer\r\n");
 }
 
 static void dump_status(GameCtx *ctx)
@@ -61,7 +61,7 @@ static void dump_opt(void)
 
 static void dump_deb(GameCtx *ctx)
 {
-    u32 b = XPAR_DEBOUNCER_AXI_0_BASEADDR;
+    u32 b = XPAR_DEBOUNCER_IP_BASEADDR;
     xil_printf("[DEB] CTRL=0x%x DEB_MS=%d BTN_MASK=0x%x STATE=0x%x EDGE=0x%x LED_CTRL=0x%02x (cfg %d ms, mask 0x%x, leds 0x%x)\r\n",
                (int)Xil_In32(b + 0x00), (int)Xil_In32(b + 0x04), (int)Xil_In32(b + 0x08),
                (int)Xil_In32(b + 0x0C), (int)Xil_In32(b + 0x10), (int)Xil_In32(b + 0x14),
@@ -72,7 +72,7 @@ static void dump_timers(void)
 {
     u16 acc[3], cpg;
     u32 shakes;
-    sensors_get_debug(acc, &cpg, &shakes);
+    sensors_acc_debug(acc, &cpg, &shakes);
     xil_printf("[IRQ] sys_ms=%d timer0=%d timer1=%d debouncer=%d | timer1_cb max=%d us | acc=(%d,%d,%d) cpg=%d movimientos=%d\r\n",
                (int)clock_sys_ms(), (int)g_irq_cnt[0], (int)g_irq_cnt[1], (int)g_irq_cnt[2],
                (int)g_t1_max_us, acc[0], acc[1], acc[2], cpg, (int)shakes);

@@ -1,6 +1,7 @@
 /*
- * sensors.c - Acelerómetro: evento "movimiento" desde la interrupción de timer1 (AO2).
- *             VERSION AVANCE (sin micrófono).
+ * accelerometer_aconditioner.c - Accelerometer_aconditioner: aX, aY, aZ del ADC ->
+ * evento "movimiento" desde la interrupción de timer1 (AO2). VERSION AVANCE: sin
+ * Microphone_aconditioner, por eso sensors_crowd_level() devuelve 0.
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (docs/MANUAL_IMPLEMENTACION.md §8.4); el ADC se lee con el driver del curso (lib/ADC.c).
@@ -46,14 +47,14 @@ u16  sensors_last_motion_mg(void)        { return g_motion_mg; }
 /* Sin micrófono en el avance: el público queda en 0 (el bonus encore no se activa). */
 u8   sensors_crowd_level(void)           { return 0u; }
 
-void sensors_get_debug(u16 *acc, u16 *cpg, u32 *shakes)
+void sensors_acc_debug(u16 *acc, u16 *cpg, u32 *shakes)
 {
     acc[0] = g_acc[0]; acc[1] = g_acc[1]; acc[2] = g_acc[2];
     *cpg = g_cpg; *shakes = g_motion_cnt;
 }
 
 /* Calibración en reposo ("no mover la placa"), antes de habilitar las interrupciones. */
-int sensors_init(void)
+int sensors_acc_init(void)
 {
     static const u8 ch[3] = { ADC_CH_ACX, ADC_CH_ACY, ADC_CH_ACZ };
     s32 sx = 0, sy = 0, sz = 0;
@@ -79,7 +80,7 @@ int sensors_init(void)
 }
 
 /* Desde la ISR de axi_timer_1 (cada 10 ms). */
-void sensors_sample(void)
+void sensors_acc_sample(void)
 {
     static const u8 ch[3] = { ADC_CH_ACX, ADC_CH_ACY, ADC_CH_ACZ };
     u16 v[3];

@@ -21,13 +21,13 @@ set_property -dict { PACKAGE_PIN V18 IOSTANDARD LVCMOS33 } [get_ports { iic_rtl_
 ## ---- Buzzer: TTC0_WAVE0_OUT del PS por EMIO (cápsula del buzzer / AYU10)
 set_property -dict { PACKAGE_PIN T14 IOSTANDARD LVCMOS33 } [get_ports { BUZZER_PWM }];        # JD1
 
-## ---- Botones de la Booster -> debouncer_axi_0/btn_in (Pmod JD) - AYU10 (BTN0, BTN1, BTN_JY)
+## ---- Botones de la Booster -> Debouncer_IP (puerto btn_raw) (Pmod JD) - AYU10 (BTN0, BTN1, BTN_JY)
 ## Activos en bajo; el pull-up interno no estorba aunque la Booster ya tenga resistencias.
-set_property -dict { PACKAGE_PIN T15 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_in[0] }];  # JD2 S1
-set_property -dict { PACKAGE_PIN P14 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_in[1] }];  # JD3 S2
-set_property -dict { PACKAGE_PIN R14 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_in[2] }];  # JD4 JOY_SEL
+set_property -dict { PACKAGE_PIN T15 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_raw[0] }];  # JD2 S1
+set_property -dict { PACKAGE_PIN P14 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_raw[1] }];  # JD3 S2
+set_property -dict { PACKAGE_PIN R14 IOSTANDARD LVCMOS33 PULLUP true } [get_ports { btn_raw[2] }];  # JD4 JOY_SEL
 
-## ---- LEDs LD0..LD3 de la Zybo <- debouncer_axi_0/leds (indicador del modo claro)
+## ---- LEDs LD0..LD3 de la Zybo <- Debouncer_IP/leds (indicador del modo claro)
 set_property -dict { PACKAGE_PIN M14 IOSTANDARD LVCMOS33 } [get_ports { leds[0] }];  # LD0
 set_property -dict { PACKAGE_PIN M15 IOSTANDARD LVCMOS33 } [get_ports { leds[1] }];  # LD1
 set_property -dict { PACKAGE_PIN G14 IOSTANDARD LVCMOS33 } [get_ports { leds[2] }];  # LD2

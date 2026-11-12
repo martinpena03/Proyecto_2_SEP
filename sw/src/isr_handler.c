@@ -1,5 +1,5 @@
 /*
- * isr.c - GIC, timers AXI y relojes del juego (ISR_handler, AO2), VERSION AVANCE.
+ * isr_handler.c - GIC, timers AXI y relojes del juego (ISR_handler, AO2), VERSION AVANCE.
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: diseño propio (docs/MANUAL_IMPLEMENTACION.md §8.1) sobre los drivers XScuGic y
@@ -9,11 +9,11 @@
  * Interrupciones (IRQ_F2P[2:0] -> GIC 61..63):
  *   axi_timer_0, 1 ms (GIC 61): sys_ms++, song_ms++ si la canción corre, star_ms-- y
  *                               buzzer_tick() (secuenciador de la melodía).
- *   axi_timer_1, 2 ms (GIC 62): cada 5 ticks sensors_sample() (acelerómetro -> evento
+ *   axi_timer_1, 2 ms (GIC 62): cada 5 ticks sensors_acc_sample() (acelerómetro -> evento
  *                               "movimiento"); cada 100 ticks levanta g_opt_poll (revisar
  *                               el comparador del OPT3001 -> "Mucha luz"); cada 15 ticks
  *                               levanta g_frame_flag (un paso de la FSM cada 30 ms).
- *   debouncer_axi_0 (GIC 63):   deb_isr() (botones S1, S2, JOY_SEL ya filtrados).
+ *   Debouncer_IP (irq_deb, GIC 63): deb_isr() (botones S1, S2, JOY_SEL ya filtrados).
  * Ninguna ISR usa el I2C ni la UART: solo leen/escriben registros rápidos y dejan
  * banderas o colas para main.
  */
@@ -26,7 +26,7 @@
 
 #define IRQ_TMR0   XPAR_FABRIC_AXI_TIMER_0_INTERRUPT_INTR
 #define IRQ_TMR1   XPAR_FABRIC_AXI_TIMER_1_INTERRUPT_INTR
-#define IRQ_DEB    XPAR_FABRIC_DEBOUNCER_AXI_0_IRQ_INTR
+#define IRQ_DEB    XPAR_FABRIC_DEBOUNCER_IP_IRQ_INTR
 
 /* Cuenta descendente con auto-recarga: el periodo es TLR + 2 ciclos del reloj AXI. */
 #define TMR_CLK_HZ      XPAR_AXI_TIMER_0_CLOCK_FREQ_HZ
@@ -73,12 +73,24 @@ static void timer1_cb(void *ref, u8 n)
     (void)n;
     XTime_GetTime(&t0);
     g_irq_cnt[1]++;
-    if (++g_sens_div >= SENS_DIV)     { g_sens_div = 0;  sensors_sample(); }
+    if (++g_sens_div >= SENS_DIV)     { g_sens_div = 0;  sensors_acc_sample(); }
     if (++g_frame_div >= FRAME_DIV)   { g_frame_div = 0; g_frame_flag = 1; }
     if (++g_opt_div >= OPT_POLL_DIV)  { g_opt_div = 0;   g_opt_poll = 1; }
     XTime_GetTime(&t1);
     us = (u32)((t1 - t0) / (COUNTS_PER_SECOND / 1000000u));
     if (us > g_t1_max_us) g_t1_max_us = us;       /* presupuesto: < 300 us */
+}
+
+/* ------------------------- irq_deb: botones (Debouncer_IP) ------------------ */
+/* Interrupción del IP propio: lee los flancos ya filtrados y los borra (W1C).
+ * S1 = OK, S2 = atrás / pausa, JOY_SEL = abajo (recorre los menús sin joystick). */
+void deb_isr(void *ref)
+{
+    GameCtx *ctx = (GameCtx *)ref;
+    u8 e = debouncer_get_edges(&ctx->deb);
+    if (e & 0x1u) ui_push(UI_OK);        /* S1      */
+    if (e & 0x2u) ui_push(UI_BACK);      /* S2      */
+    if (e & 0x4u) ui_push(UI_DOWN);      /* JOY_SEL */
 }
 
 static void deb_isr_wrap(void *ref) { g_irq_cnt[2]++; deb_isr(ref); }

@@ -47,7 +47,7 @@ static void init_all(GameCtx *c)
     /* ADC SPI: acelerómetro (calibración en reposo). */
     r = (init_adc(&SpiInstance1, SPI_DEVICE_ID_1) == XST_SUCCESS) ? 0 : -1;
     report("ADC SPI", r);
-    report("acelerometro", sensors_init());
+    report("acelerometro", sensors_acc_init());
 
     /* I2C + sensor de luz. Si falla, el tema queda fijo en oscuro. */
     r = (init_IIC() == XST_SUCCESS) ? 0 : -1;
@@ -58,14 +58,14 @@ static void init_all(GameCtx *c)
 
     /* IP propio con la configuración por defecto (se cambia desde CONFIG por la UART). */
     debcfg_default(&c->cfg);
-    report("IP debouncer_axi", fsm_apply_cfg(c, &c->cfg));
+    report("IP Debouncer_IP", fsm_apply_cfg(c, &c->cfg));
 
     buzzer_init(&c->bz, 50);
     report("timers + GIC", isr_init(c));
 }
 
 /* AO2: el acelerómetro no tiene pin de interrupción (salida analógica). La detección
- * corre dentro de la ISR de axi_timer_1 (sensors_sample, cada 10 ms) y aquí solo se
+ * corre dentro de la ISR de axi_timer_1 (sensors_acc_sample, cada 10 ms) y aquí solo se
  * imprime el aviso, porque la UART no se usa dentro de una interrupción. */
 static void motion_task(void)
 {
@@ -81,7 +81,7 @@ static void motion_task(void)
 int main(void)
 {
     init_all(&ctx);
-    xil_printf("\r\n--- AVANCE: AO2 (luz + acelerometro por interrupcion de timer), AO3 (debouncer_axi + LEDs del modo claro),\r\n"
+    xil_printf("\r\n--- AVANCE: AO2 (luz + acelerometro por interrupcion de timer), AO3 (Debouncer_IP + LEDs del modo claro),\r\n"
                "    AC1 (maquina de estados por consola), AC6 (melodia del menu) ---\r\n"
                "    Luz: oscuro < %d lux, claro > %d lux. Botones: S1 = OK, S2 = atras, JOY_SEL = abajo. 'h' = ayuda.\r\n",
                OPT_LO_LUX, OPT_HI_LUX);

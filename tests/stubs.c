@@ -4,8 +4,8 @@
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (docs/MANUAL_IMPLEMENTACION.md §12.1).
  *
- * Permiten compilar y probar la lógica portable (game_engine, game_fsm, render,
- * audio_seq, uart_config, ...) sin la Zybo. Cada stub guarda lo que recibió en variables
+ * Permiten compilar y probar la lógica portable (game_manager, state_machine, screen_manager,
+ * sound_manager, uart_config, ...) sin la Zybo. Cada stub guarda lo que recibió en variables
  * globales que los tests inspeccionan (ver stubs.h). lcd_fill / lcd_blit están en
  * sim/fb.c (framebuffer).
  */
@@ -79,13 +79,13 @@ void stub_uart_feed(const char *s)
     }
 }
 
-/* ----------------------------- relojes (isr.c) ----------------------------- */
+/* ----------------------------- relojes (isr_handler.c) ----------------------------- */
 u32  clock_sys_ms(void)        { return stub_sys_ms; }
 u32  clock_song_ms(void)       { return stub_song_ms; }
 void clock_song_set(u32 ms)    { stub_song_ms = ms; }
 void clock_song_run(int run)   { stub_song_running = (run != 0); }
 
-/* ----------------------------- entradas (input.c) -------------------------- */
+/* ----------------------------- entradas (event_queues.c) -------------------------- */
 void input_set_play_mode(int play)      { stub_play_mode = play; }
 void input_flush(void)                  { hq_head = hq_tail = 0; stub_flush_count++; }
 UiEvent ui_pop(void)                    { return UI_NONE; }
@@ -102,7 +102,7 @@ void  sensors_set_shake_threshold(u16 mg) { stub_shake_mg = mg; }
 u8    sensors_crowd_level(void)           { return stub_crowd; }
 Theme theme_current(void)                 { return stub_theme; }
 
-/* ----------------------------- buzzer (audio.c) ---------------------------- */
+/* ----------------------------- buzzer (ttc0_pwm.c) ---------------------------- */
 void buzzer_tone(Buzzer_t *bz, u16 f_hz, u8 vol)
 {
     (void)vol;
@@ -111,7 +111,7 @@ void buzzer_tone(Buzzer_t *bz, u16 f_hz, u8 vol)
     stub_tone_calls++;
 }
 
-/* ----------------------------- IP propio (debouncer_axi.c) ----------------- */
+/* ----------------------------- IP propio (debouncer_ip.c) ----------------- */
 int debouncer_init(Debouncer *dev, const DebCfg *cfg)
 {
     if (dev == NULL || cfg == NULL) return -1;
@@ -135,7 +135,7 @@ void debouncer_readback(const Debouncer *dev, u16 *deb_ms, u8 *btn_mask)
     *btn_mask = dev->cfg.btn_mask;
 }
 
-/* ----------------------------- UART (uart_hal.c) --------------------------- */
+/* ----------------------------- UART (uart1.c) --------------------------- */
 int uart_hal_getc(void)
 {
     if (ui_pos >= ui_len) return -1;
@@ -148,7 +148,7 @@ void uart_hal_puts(const char *s)
     if (used + n < sizeof stub_uart_out) memcpy(stub_uart_out + used, s, n + 1);
 }
 
-/* ----------------------------- SD (sd_storage.c) --------------------------- */
+/* ----------------------------- SD (sd_manager.c) --------------------------- */
 int sd_init(SdCtx *sd)
 {
     sd->mounted = (u8)(stub_sd_mounted != 0);

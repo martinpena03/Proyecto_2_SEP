@@ -1,12 +1,12 @@
 /*
- * audio_seq.c - Secuenciador no bloqueante del buzzer (Sound Manager, AC6).
+ * sound_manager.c - Secuenciador no bloqueante del buzzer (Sound Manager, AC6).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: idea del reproductor no bloqueante de la cápsula "Buzzer Proyecto 2" del
  *   curso (Buzzer_Tick llamado desde la interrupción de un timer, sin usleep);
  *   implementación propia (docs/MANUAL_IMPLEMENTACION.md §8.6).
  *
- * Portable: solo llama a buzzer_tone() (audio.c en la placa: PWM del TTC0; stub en el PC).
+ * Portable: solo llama a buzzer_tone() (ttc0_pwm.c en la placa: PWM del TTC0; stub en el PC).
  *
  * buzzer_tick() se llama cada 1 ms desde la interrupción de axi_timer_0. Hay dos pistas:
  *   - principal: la canción (sigue el reloj de canción song_ms, así la pausa la congela)

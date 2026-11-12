@@ -26,11 +26,11 @@ Las horas son estimaciones para comprobar que la carga queda pareja. No son un c
 | # | Tarea | Actividad | Archivos | h |
 |---|---|---|---|---|
 | A1 | Block design completo (PS, interconnect, SPI×2, IIC, GPIO×2, timers×2, concat, EMIO del TTC0), `.xdc`, exportar `.xsa` y `write_bd_tcl` al repo | base | `hw/bd/`, `hw/constraints/`, `hw/export/` | 8 |
-| A2 | LCD (driver del curso) y lectura del ADC por SPI: joystick, acelerómetro y micrófono. `sensors.c`: shake, nivel del público y dirección del joystick con histéresis | AO1, AC3 | `sensors.c/.h`, `lib/` | 8 |
-| A3 | OPT3001 por I²C: escribir `CONFIG`, `LOW_LIMIT` y `HIGH_LIMIT`, leer `RESULT`. Interrupción OPT_INT por `axi_gpio_1` CH2 → `theme.c` (claro/oscuro). **Confirmar el pin OPT_INT** | AO1, AO2 | `opt3001.c/.h`, `theme.c/.h` | 6 |
-| A4 | `axi_timer_0` (1 ms) y `axi_timer_1` (10 ms) con XScuGic. `isr.c` y `input.c`, con S1, S2 y JOY_SEL por `axi_gpio_1` CH1 | AO2 | `isr.c/.h`, `input.c/.h` | 4 |
-| A5 | Buzzer a bajo nivel: TTC0 en modo interval + match → PWM por EMIO. `buzzer_tone(&bz, f, vol)` | AC6 | `audio.c` (parte HW) | 3 |
-| A6 | SD con xilffs: `f_mount`, lectura y escritura. Boot: FSBL + `BOOT.BIN` en la SD | AC7, AC4 | `sd_storage.c` (parte HW), `boot/` | 6 |
+| A2 | LCD (driver del curso) y lectura del ADC por SPI: joystick, acelerómetro y micrófono. `accelerometer_aconditioner.c`: shake, nivel del público y dirección del joystick con histéresis | AO1, AC3 | `accelerometer_aconditioner.c/.h`, `lib/` | 8 |
+| A3 | OPT3001 por I²C: escribir `CONFIG`, `LOW_LIMIT` y `HIGH_LIMIT`, leer `RESULT`. Interrupción OPT_INT por `axi_gpio_1` CH2 → `theme.c` (claro/oscuro). **Confirmar el pin OPT_INT** | AO1, AO2 | `light_aconditioner.c/.h`, `theme.c/.h` | 6 |
+| A4 | `axi_timer_0` (1 ms) y `axi_timer_1` (10 ms) con XScuGic. `isr_handler.c` y `event_queues.c`, con S1, S2 y JOY_SEL por `axi_gpio_1` CH1 | AO2 | `isr_handler.c/.h`, `event_queues.c/.h` | 4 |
+| A5 | Buzzer a bajo nivel: TTC0 en modo interval + match → PWM por EMIO. `buzzer_tone(&bz, f, vol)` | AC6 | `ttc0_pwm.c` (parte HW) | 3 |
+| A6 | SD con xilffs: `f_mount`, lectura y escritura. Boot: FSBL + `BOOT.BIN` en la SD | AC7, AC4 | `sd_manager.c` (parte HW), `boot/` | 6 |
 | A7 | VIO + ILA sobre el IP de B (sondear `btn_raw`, `EDGE` e `irq`), con capturas para el informe | AC5 | BD, `docs/` | 4 |
 | A8 | Integración en la placa de cada PR de B, depuración y grabación del funcionamiento en la Zybo para el video | todas | — | 8 |
 
@@ -39,10 +39,10 @@ Las horas son estimaciones para comprobar que la carga queda pareja. No son un c
 | # | Tarea | Actividad | Archivos | h |
 |---|---|---|---|---|
 | B1 | IP `debouncer_axi` en VHDL: antirrebote configurable (`DEB_MS`), detector de flanco, registros AXI4-Lite (`CTRL`, `DEB_MS`, `LANE_MASK`, `EDGE`, `STATE`) e `irq`. **Testbench y simulación** en xsim. Empaquetado como IP (subir la core revision en cada cambio) | AO3 | `hw/ip_repo/debouncer_axi/` | 10 |
-| B2 | Driver C `debouncer_init(Debouncer *dev, const DebCfg *cfg)` y `debouncer_get_edges()`. `uart_config.c`: pedir `DEB_MS`, `LANE_MASK` y `UMBRAL_SHAKE` por consola y validarlos | AO3 | `debouncer_axi.c/.h`, `uart_config.c/.h` | 5 |
-| B3 | `game_engine.c` (juzgar hits, puntaje, streak, star power ×2, rock meter, encore) y `game_fsm.c` (INIT → MENU → NIVEL → JUEGO ⇄ PAUSA → GAME OVER, RÉCORDS, CONFIG). **Tests en el PC** | AC1, AC2 | `game_engine.c/.h`, `game_fsm.c/.h`, `tests/` | 10 |
-| B4 | `render.c`: menús, pista de 4 carriles, notas, HUD, pantalla final y paleta según el tema y el star power. **Simulador en el PC**: stub de `GUI_*` que escribe un `.ppm` de 128×128 para ver las pantallas sin la placa | AO1 | `render.c/.h`, `sim/` | 9 |
-| B5 | Formato de `SONG1.SHC` y script en Python que genera el chart desde una melodía. Elegir la melodía. Secuenciador `buzzer_tick()` (avanza notas). Formato de `RECORDS.TXT` y su parser/serializador (portable, probado en el PC) | AC6, AC7 | `tools/`, `audio.c` (secuenciador), `sd_storage.c` (parser) | 7 |
+| B2 | Driver C `debouncer_init(Debouncer *dev, const DebCfg *cfg)` y `debouncer_get_edges()`. `uart_config.c`: pedir `DEB_MS`, `LANE_MASK` y `UMBRAL_SHAKE` por consola y validarlos | AO3 | `debouncer_ip.c/.h`, `uart_config.c/.h` | 5 |
+| B3 | `game_manager.c` (juzgar hits, puntaje, streak, star power ×2, rock meter, encore) y `state_machine.c` (INIT → MENU → NIVEL → JUEGO ⇄ PAUSA → GAME OVER, RÉCORDS, CONFIG). **Tests en el PC** | AC1, AC2 | `game_manager.c/.h`, `state_machine.c/.h`, `tests/` | 10 |
+| B4 | `screen_manager.c`: menús, pista de 4 carriles, notas, HUD, pantalla final y paleta según el tema y el star power. **Simulador en el PC**: stub de `GUI_*` que escribe un `.ppm` de 128×128 para ver las pantallas sin la placa | AO1 | `screen_manager.c/.h`, `sim/` | 9 |
+| B5 | Formato de `SONG1.SHC` y script en Python que genera el chart desde una melodía. Elegir la melodía. Secuenciador `buzzer_tick()` (avanza notas). Formato de `RECORDS.TXT` y su parser/serializador (portable, probado en el PC) | AC6, AC7 | `tools/`, `ttc0_pwm.c` (secuenciador), `sd_manager.c` (parser) | 7 |
 | B6 | Slides del diagrama (1 a 3) para el video, y edición final del video (OBS + VSDC) | video | `docs/video/` | 6 |
 
 ### Compartido (≈ 8 h cada uno)
@@ -58,16 +58,16 @@ Las horas son estimaciones para comprobar que la carga queda pareja. No son un c
 
 | Actividad | Responsable | Dónde |
 |---|---|---|
-| AO1: pantalla + 3 periféricos + 2 registros | A (periféricos, OPT3001), B (contenido de la pantalla) | `sensors.c`, `opt3001.c`, `render.c` |
-| AO2: 2 timers + interrupción del sensor de luz | A | `isr.c`, `theme.c` |
-| AO3: IP propio + función con punteros + config por UART | B | `hw/ip_repo/debouncer_axi`, `debouncer_axi.c`, `uart_config.c` |
-| AC1: máquina de estados | B | `game_fsm.c` |
-| AC2: structs, arreglos, punteros, funciones, macros | B (y ambos) | `game_types.h`, `game_engine.c` |
-| AC3: 2 periféricos extra (joystick, botones S1/S2) | A | `sensors.c`, `input.c` |
+| AO1: pantalla + 3 periféricos + 2 registros | A (periféricos, OPT3001), B (contenido de la pantalla) | `accelerometer_aconditioner.c`, `light_aconditioner.c`, `screen_manager.c` |
+| AO2: 2 timers + interrupción del sensor de luz | A | `isr_handler.c`, `theme.c` |
+| AO3: IP propio + función con punteros + config por UART | B | `hw/ip_repo/debouncer_axi`, `debouncer_ip.c`, `uart_config.c` |
+| AC1: máquina de estados | B | `state_machine.c` |
+| AC2: structs, arreglos, punteros, funciones, macros | B (y ambos) | `game_types.h`, `game_manager.c` |
+| AC3: 2 periféricos extra (joystick, botones S1/S2) | A | `accelerometer_aconditioner.c`, `event_queues.c` |
 | AC4: boot | A | `boot/` |
 | AC5: VIO e ILA | A | BD + capturas |
-| AC6: buzzer con música | A (PWM), B (melodía y secuenciador) | `audio.c` |
-| AC7: SD | A (FatFs), B (formatos y parser) | `sd_storage.c`, `tools/` |
+| AC6: buzzer con música | A (PWM), B (melodía y secuenciador) | `ttc0_pwm.c` |
+| AC7: SD | A (FatFs), B (formatos y parser) | `sd_manager.c`, `tools/` |
 
 ## Cómo trabajar sin que B tenga la placa
 

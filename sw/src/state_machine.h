@@ -1,5 +1,5 @@
 /*
- * game_fsm.h - Contexto global del juego (GameCtx) y accesores.
+ * state_machine.h - Contexto global del juego (GameCtx) y accesores.
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (docs/MANUAL_IMPLEMENTACION.md §9.2).
@@ -8,8 +8,8 @@
  * declara como 'static' (unos 7 KB: no cabe en el stack) y que el resto de los módulos
  * recibe por puntero (AC2).
  */
-#ifndef GAME_FSM_H
-#define GAME_FSM_H
+#ifndef STATE_MACHINE_H
+#define STATE_MACHINE_H
 
 #include "interfaces.h"
 
@@ -45,11 +45,11 @@ struct GameCtx {
     int  cfg_status;                /* resultado del último debouncer_init            */
 };
 
-/* Accesores usados por las ISR (isr.c), que no necesitan conocer el resto del contexto. */
+/* Accesores usados por las ISR (isr_handler.c), que no necesitan conocer el resto del contexto. */
 static inline GameState *ctx_gs(GameCtx *c) { return &c->gs; }
 static inline Buzzer_t  *ctx_bz(GameCtx *c) { return &c->bz; }
 
 /* Aplica una configuración: IP propio + umbrales de joystick y acelerómetro. */
 int fsm_apply_cfg(GameCtx *ctx, const DebCfg *cfg);
 
-#endif /* GAME_FSM_H */
+#endif /* STATE_MACHINE_H */
