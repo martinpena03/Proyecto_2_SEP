@@ -12,7 +12,7 @@
 #   sh sw/scripts/build_app.sh sound     -> como debug pero con sonido (pruebas con el
 #                                           usuario presente)
 # Variables opcionales:  EXTRA="-D..."
-# Salida: sw/workspace/sep_hero/<Debug|Release|Sound>/sep_hero.elf
+# Salida: sw/workspace/sep_hero/cli_<Debug|Release|Sound>/sep_hero.elf
 # Requiere haber corrido antes:  xsct sw/scripts/vitis_platform.tcl
 # =============================================================================
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -27,7 +27,7 @@ export PATH="/d/Xilinx/Vitis/2020.1/gnu/aarch32/nt/gcc-arm-none-eabi/bin:$PATH"
 WS="$ROOT/sw/workspace"
 BSP="$WS/sephero_platform/export/sephero_platform/sw/sephero_platform/standalone_domain"
 SRC="$ROOT/sw/src"
-OUT="$WS/sep_hero/$OUTN"
+OUT="$WS/sep_hero/cli_$OUTN"   # cli_: no choca con Debug/Release de la GUI de Vitis
 [ -d "$BSP/bspinclude/include" ] || { echo "falta el BSP: correr vitis_platform.tcl"; exit 1; }
 mkdir -p "$OUT/obj"
 rm -f "$OUT"/obj/*.o

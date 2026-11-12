@@ -18,7 +18,7 @@ set ONLY_MODE 0
 foreach a $argv {
     if {$a eq "bootmode"} { set ONLY_MODE 1 } else { set CFG $a }
 }
-set ELF  $ROOT/sw/workspace/sep_hero/$CFG/sep_hero.elf
+set ELF  $ROOT/sw/workspace/sep_hero/cli_$CFG/sep_hero.elf   ;# salida de build_app.sh
 
 connect
 targets -set -nocase -filter {name =~ "*A9*#0"}

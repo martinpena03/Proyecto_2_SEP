@@ -19,7 +19,7 @@ WS="$ROOT/sw/workspace"
 VITIS="/d/Xilinx/Vitis/2020.1"
 FSBL="$WS/sephero_platform/export/sephero_platform/sw/sephero_platform/boot/fsbl.elf"
 BIT="$(ls "$WS"/sephero_platform/hw/*.bit | head -1)"
-ELF="$WS/sep_hero/Release/sep_hero.elf"
+ELF="$WS/sep_hero/cli_Release/sep_hero.elf"
 for f in "$FSBL" "$BIT" "$ELF"; do [ -f "$f" ] || { echo "falta $f"; exit 1; }; done
 
 # Copias con nombres fijos junto al .bif, para que el BIF sea relativo y versionable.
