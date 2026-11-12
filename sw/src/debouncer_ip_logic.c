@@ -26,7 +26,7 @@ int debcfg_validate(const DebCfg *c)
     if (c == NULL)                                         return -1;
     if (c->deb_ms < DEB_MS_MIN || c->deb_ms > DEB_MS_MAX)  return -2;
     if (c->btn_mask < 1u || c->btn_mask > 0x7u)            return -3;
-    /* Hace falta S1 (bit 0): es el único OK de los menús (JOY_SEL baja el cursor). */
+    /* Hace falta S1 (bit 0): es el único OK de los menús (JOY_SEL alterna la música). */
     if ((c->btn_mask & 0x1u) == 0u)                        return -4;
     if (c->umbral_shake < SHAKE_MG_MIN || c->umbral_shake > SHAKE_MG_MAX)   return -6;
     if (c->led_pattern < LED_PAT_MIN || c->led_pattern > LED_PAT_MAX)       return -7;

@@ -13,7 +13,7 @@
  *                               "movimiento"); cada 100 ticks levanta g_opt_poll (revisar
  *                               el comparador del OPT3001 -> "Mucha luz"); cada 15 ticks
  *                               levanta g_frame_flag (un paso de la FSM cada 30 ms).
- *   Debouncer_IP (irq_deb, GIC 63): deb_isr() (botones S1, S2, JOY_SEL ya filtrados).
+ *   Debouncer_IP (irq_deb, GIC 63): deb_isr() (S1 = OK, S2 = atrás, JOY_SEL = música ON/OFF).
  * Ninguna ISR usa el I2C ni la UART: solo leen/escriben registros rápidos y dejan
  * banderas o colas para main.
  */
@@ -83,14 +83,19 @@ static void timer1_cb(void *ref, u8 n)
 
 /* ------------------------- irq_deb: botones (Debouncer_IP) ------------------ */
 /* Interrupción del IP propio: lee los flancos ya filtrados y los borra (W1C).
- * S1 = OK, S2 = atrás / pausa, JOY_SEL = abajo (recorre los menús sin joystick). */
+ * S1 = OK, S2 = atrás / pausa, JOY_SEL = música ON / OFF (silencio enclavado: cada
+ * pulsación lo alterna). La ISR solo cuenta; main imprime el aviso (btn_task) y cambia
+ * el mudo (audio_user_mute_task), porque la UART no se usa dentro de una interrupción. */
+volatile u8 g_mute_req;                  /* pulsaciones de JOY_SEL pendientes           */
+volatile u8 g_btn_cnt[3];                /* pulsaciones vistas por la ISR: S1, S2, JOY_SEL */
+
 void deb_isr(void *ref)
 {
     GameCtx *ctx = (GameCtx *)ref;
     u8 e = debouncer_get_edges(&ctx->deb);
-    if (e & 0x1u) ui_push(UI_OK);        /* S1      */
-    if (e & 0x2u) ui_push(UI_BACK);      /* S2      */
-    if (e & 0x4u) ui_push(UI_DOWN);      /* JOY_SEL */
+    if (e & 0x1u) { g_btn_cnt[0]++; ui_push(UI_OK); }      /* S1      */
+    if (e & 0x2u) { g_btn_cnt[1]++; ui_push(UI_BACK); }    /* S2      */
+    if (e & 0x4u) { g_btn_cnt[2]++; g_mute_req++; }        /* JOY_SEL */
 }
 
 static void deb_isr_wrap(void *ref) { g_irq_cnt[2]++; deb_isr(ref); }

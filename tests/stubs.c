@@ -26,7 +26,7 @@ DebCfg stub_deb_cfg;
 int   stub_sd_mounted;
 int   stub_sd_saves;
 char  stub_sd_records[256];
-char  stub_uart_out[4096];
+char  stub_uart_out[16384];
 
 static Hit  hitq[64];
 static int  hq_head, hq_tail;

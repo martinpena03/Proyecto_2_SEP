@@ -59,7 +59,7 @@ static void prompt(const UartCfg *u)
         p = fmt_u32(p, u->tmp.deb_ms);
         break;
     case 1:
-        p = fmt_str(p, "BTN_MASK [hex 1-7, con bit0: bit0 S1=OK, bit1 S2=atras, bit2 SEL=abajo] (actual ");
+        p = fmt_str(p, "BTN_MASK [hex 1-7, con bit0: bit0 S1=OK, bit1 S2=atras, bit2 SEL=mudo] (actual ");
         p = fmt_hex(p, u->tmp.btn_mask, 1);
         break;
     case 2:

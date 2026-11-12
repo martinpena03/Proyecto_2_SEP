@@ -47,25 +47,41 @@ int fsm_apply_cfg(GameCtx *ctx, const DebCfg *cfg)
     return r;
 }
 
-/* Carga la canción elegida y arma el preview (primeras notas con el tiempo desde 0). */
+/* Carga la canción elegida. En el avance los niveles no suenan (ni preview ni canción):
+ * solo existen en la máquina de estados, así que se informa por consola cuál quedó. */
 static void load_selected_song(GameCtx *ctx)
 {
-    u16 i, n;
-    u32 t0;
+    char b[96];
+    char *p = b;
     int r = sd_load_song(&ctx->sd, &ctx->song, ctx->pool, ctx->song_sel);
 
     ctx->song_ok = (u8)(r > 0);
-    if (!ctx->song_ok) {
-        buzzer_stop(&ctx->bz);
-        return;
+    buzzer_stop(&ctx->bz);                       /* la melodía del menú no sigue aquí */
+    p = fmt_str(p, "   [LEVEL] nivel ");
+    p = fmt_u32(p, (u32)ctx->song_sel + 1u);
+    p = fmt_str(p, "/");
+    p = fmt_u32(p, N_SONGS);
+    if (ctx->song_ok) {
+        p = fmt_str(p, ": ");
+        p = fmt_str(p, ctx->song.name);
+        p = fmt_str(p, " (");
+        p = fmt_u32(p, ctx->song.n);
+        p = fmt_str(p, " notas, sin musica en el avance)\r\n");
+    } else {
+        p = fmt_str(p, ": error de carga\r\n");
     }
-    n  = (ctx->song.n < PREVIEW_N) ? ctx->song.n : (u16)PREVIEW_N;
-    t0 = ctx->song.chart[0].t_ms;
-    for (i = 0; i < n; i++) {
-        ctx->preview[i] = ctx->song.chart[i];
-        ctx->preview[i].t_ms = ctx->song.chart[i].t_ms - t0 + 300u;   /* 300 ms de respiro */
-    }
-    buzzer_play_jingle(&ctx->bz, ctx->preview, n, 1);
+    uart_hal_puts(b);
+}
+
+/* Cuenta regresiva de PLAY por consola: una línea por segundo de canción. */
+static void announce_countdown(u8 left)
+{
+    char b[48];
+    char *p = b;
+    p = fmt_str(p, "   [PLAY] quedan ");
+    p = fmt_u32(p, left);
+    p = fmt_str(p, " s\r\n");
+    uart_hal_puts(b);
 }
 
 /* ¿El puntaje entra al top 5? */
@@ -85,9 +101,9 @@ static void announce_state(FsmState s)
         "GAMEOVER", "RECORDS", "CONFIG (parametros por UART)" };
     static const char *const HINT[] = {
         "inicio; pasa solo al MENU en 1,5 s",
-        "u/j (o JOY_SEL) mueve el cursor (Jugar, Records, Configurar), 1 (o S1) entra",
-        "u/j cambia la cancion (suena el preview), 1 juega, 2 (o S2) vuelve al MENU",
-        "p = autoplay (sin joystick en el avance), sacudir la placa = star power, 2 = PAUSE",
+        "u/j mueve el cursor (Jugar, Records, Configurar), 1 (o S1) entra, JOY_SEL = musica ON/OFF",
+        "u/j cambia el nivel (sin musica), 1 (o S1) juega, 2 (o S2) vuelve al MENU",
+        "20 s de partida; p = autoplay, sacudir la placa = star power, 2 (o S2) = PAUSE",
         "u/j elige (Continuar, Reiniciar, Salir), 1 confirma, 2 continua",
         "1 o 2 vuelve al MENU",
         "1 o 2 vuelve al MENU",
@@ -163,8 +179,9 @@ static void start_game(GameCtx *ctx)
     ctx->count_shown = 0;
     clock_song_set(0);
     clock_song_run(1);
-    buzzer_play(&ctx->bz, &ctx->song);
+    buzzer_stop(&ctx->bz);                      /* avance: el nivel no tiene música */
     enter_state(ctx, ST_PLAY);
+    uart_hal_puts("Juego iniciado\r\n");
 }
 
 /* Continuar tras la pausa. */
@@ -265,24 +282,28 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         now = clock_song_ms();
         game_update(&ctx->gs, &ctx->song, now);                              /* 2.o el tiempo  */
 
-        /* Cuenta 3-2-1 durante el lead-in: un beep por segundo. */
-        if (now < LEADIN_MS) {
-            u8 k = (u8)(now / 1000u + 1u);
-            if (k != ctx->count_shown) {
-                ctx->count_shown = k;
-                buzzer_play_sfx(&ctx->bz, SFX_COUNT, SFX_COUNT_N);
+        /* Avance: la partida dura AVANCE_PLAY_MS de reloj de canción (se congela en
+         * PAUSE). Cada segundo se imprime cuánto falta; no hay sonido en el nivel. */
+        if (now < AVANCE_PLAY_MS) {
+            u8 left = (u8)((AVANCE_PLAY_MS - now + 999u) / 1000u);
+            if (left != ctx->count_shown) {
+                ctx->count_shown = left;
+                announce_countdown(left);
             }
         }
 
         if (ev == UI_SHAKE) {                                               /* acelerómetro */
-            if (game_try_star_power(&ctx->gs)) buzzer_play_sfx(&ctx->bz, SFX_STAR, SFX_STAR_N);
+            if (game_try_star_power(&ctx->gs)) uart_hal_puts("   [PLAY] star power activado\r\n");
         } else if (ev == UI_BACK) {
             enter_state(ctx, ST_PAUSE);
             break;
         }
 
-        res = game_is_over(&ctx->gs, &ctx->song, now);
+        /* Fin por tiempo: gana si el rock meter sigue sobre 0 (las reglas de
+         * game_manager.c siguen corriendo; con autoplay se gana, sin tocar se pierde). */
+        res = (now >= AVANCE_PLAY_MS) ? ((ctx->gs.rock > 0) ? RESULT_WIN : RESULT_LOSE) : RESULT_NONE;
         if (res != RESULT_NONE) {
+            uart_hal_puts("   [PLAY] tiempo cumplido: fin de la partida\r\n");
             ctx->result = (u8)res;
             enter_state(ctx, ST_GAMEOVER);
         }

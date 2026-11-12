@@ -11,7 +11,9 @@
  *   AO3: IP propio debouncer_axi (botones + LEDs del modo claro), configurado por UART
  *        con debouncer_init(Debouncer *, const DebCfg *).
  *   AC1: máquina de estados; cada estado se anuncia por consola.
- *   AC6: melodía del menú en el buzzer (TTC0).
+ *   AC6: melodía del menú en el buzzer (TTC0); JOY_SEL la silencia o la reanuda.
+ * Los niveles solo existen en la máquina de estados (sin música): PLAY imprime
+ * "Juego iniciado" y una cuenta regresiva de 20 s antes de pasar a GAMEOVER.
  */
 #include "xparameters.h"
 #include "xil_printf.h"
@@ -78,18 +80,37 @@ static void motion_task(void)
     }
 }
 
+/* AO2 / AO3: aviso por consola de cada interrupción de Debouncer_IP (irq_deb, GIC 63).
+ * La ISR cuenta las pulsaciones ya filtradas (g_btn_cnt) y aquí se imprimen. */
+static void btn_task(void)
+{
+    static const char *const NAME[3] = { "S1 -> OK", "S2 -> atras / pausa", "JOY_SEL -> musica ON/OFF" };
+    static u8 seen[3];
+    int i;
+    for (i = 0; i < 3; i++) {
+        u8 n = g_btn_cnt[i];
+        if (n != seen[i]) {
+            seen[i] = n;
+            xil_printf("\r\n*** [IRQ] Debouncer_IP (GIC 63): %s *** irq #%d\r\n", NAME[i], (int)g_irq_cnt[2]);
+        }
+    }
+}
+
 int main(void)
 {
     init_all(&ctx);
     xil_printf("\r\n--- AVANCE: AO2 (luz + acelerometro por interrupcion de timer), AO3 (Debouncer_IP + LEDs del modo claro),\r\n"
                "    AC1 (maquina de estados por consola), AC6 (melodia del menu) ---\r\n"
-               "    Luz: oscuro < %d lux, claro > %d lux. Botones: S1 = OK, S2 = atras, JOY_SEL = abajo. 'h' = ayuda.\r\n",
+               "    Luz: oscuro < %d lux, claro > %d lux. Botones: S1 = OK, S2 = atras, JOY_SEL = musica ON/OFF. 'h' = ayuda.\r\n"
+               "    Los niveles no tienen musica: PLAY dura 20 s con cuenta regresiva por consola.\r\n",
                OPT_LO_LUX, OPT_HI_LUX);
     fsm_start(&ctx);                             /* canciones embebidas y estado INIT */
 
     while (1) {
         theme_task();                            /* OPT3001 por I2C cada 200 ms (AO2) */
         motion_task();                           /* aviso del acelerómetro (AO2)      */
+        btn_task();                              /* aviso de los botones (irq_deb)    */
+        audio_user_mute_task();                  /* JOY_SEL: música ON / OFF          */
         console_poll(&ctx);                      /* teclado del PC                    */
         if (g_frame_flag) {                      /* cada 30 ms (axi_timer_1)          */
             UiEvent ev;

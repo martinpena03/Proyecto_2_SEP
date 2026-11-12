@@ -17,6 +17,7 @@
  */
 #include "xparameters.h"
 #include "xttcps.h"
+#include "xil_printf.h"
 #include "hw.h"
 
 static XTtcPs ttc;                 /* TTC0, contador 0 -> TTC0_WAVE0_OUT */
@@ -49,6 +50,26 @@ int audio_hw_init(void)
 }
 
 int audio_is_muted(void) { return g_mute; }
+
+/* Silencio pedido por el usuario con JOY_SEL (enclavado: cada pulsación lo alterna).
+ * Es independiente del mudo de seguridad: con SEP_MUTE = 1 el botón no puede habilitar
+ * el sonido. El secuenciador sigue avanzando en silencio, así al volver la música
+ * retoma en la nota que corresponde. Se llama desde main, no desde la ISR. */
+static u8 g_user_mute;
+
+int audio_user_muted(void) { return g_user_mute; }
+
+void audio_user_mute_task(void)
+{
+    static u8 seen;
+    u8 req = g_mute_req;
+    if (req == seen) return;
+    if ((u8)(req - seen) & 1u) g_user_mute = (u8)!g_user_mute;   /* pulsaciones impares */
+    seen = req;
+    if (!SEP_MUTE) audio_set_mute(g_user_mute);
+    xil_printf("[BUZ] JOY_SEL -> musica %s%s\r\n", g_user_mute ? "OFF (silencio)" : "ON",
+               SEP_MUTE ? " (build en mudo: el buzzer sigue deshabilitado)" : "");
+}
 
 /* Habilita o deshabilita la salida. Al cambiar deja el buzzer en silencio; la próxima
  * nota del secuenciador lo vuelve a programar. */

@@ -39,6 +39,7 @@ typedef int32_t  s32;
 #define MAX_NOTES         512u     /* capacidad del pool de notas                        */
 #define MAX_RECORDS       5u       /* top 5                                              */
 
+#define AVANCE_PLAY_MS    20000u   /* avance: duración fija de PLAY (cuenta regresiva)   */
 #define LEADIN_MS         3000u    /* cuenta 3-2-1: la 1.a nota del chart cae >= 3 s     */
 #define SONG_TAIL_MS      2000u    /* margen tras la última nota para declarar el fin    */
 #define NOTE_LOOKAHEAD_MS 1500u    /* tiempo que tarda una nota en recorrer la pista     */

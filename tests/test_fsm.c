@@ -71,6 +71,8 @@ void test_fsm(void)
 
     /* LEVEL: carga la canción 1, cambia a la 2 y vuelve. */
     frame(UI_OK);    CHECK(ctx.st == ST_LEVEL && ctx.song_ok && ctx.song.n == 62);
+    CHECK(!ctx.bz.playing);                                 /* avance: niveles sin música */
+    CHECK(strstr(stub_uart_out, "[LEVEL] nivel 1/2: ") != NULL);
     frame(UI_DOWN);  CHECK(ctx.song_sel == 1 && ctx.song.n == 74);
     frame(UI_DOWN);  CHECK(ctx.song_sel == 0 && ctx.song.n == 62);
     frame(UI_BACK);  CHECK(ctx.st == ST_MENU);
@@ -79,6 +81,10 @@ void test_fsm(void)
     /* PLAY: modo juego del joystick, reloj de canción corriendo. */
     frame(UI_OK);
     CHECK(ctx.st == ST_PLAY && stub_play_mode == 1 && stub_song_running && ctx.gs.rock == ROCK_START);
+    CHECK(!ctx.bz.playing && strstr(stub_uart_out, "Juego iniciado\r\n") != NULL);
+    frame(UI_NONE);
+    CHECK(strstr(stub_uart_out, "[PLAY] quedan 20 s") != NULL);
+    CHECK(strstr(stub_uart_out, "[PLAY] quedan 19 s") == NULL);
     autoplay(8000);
     CHECK(ctx.gs.hits >= 10 && ctx.gs.misses == 0 && ctx.gs.score == (u32)ctx.gs.hits * PTS_NOTA);
     CHECK(ctx.gs.star_phase == STAR_READY);
@@ -110,10 +116,14 @@ void test_fsm(void)
     frame(UI_BACK);  frame(UI_DOWN);  frame(UI_OK);
     CHECK(ctx.st == ST_PLAY && stub_song_ms < 100 && ctx.gs.score == 0 && ctx.gs.hits == 0);
 
-    /* Partida perfecta hasta el final => VICTORIA y entra al top 5. */
+    /* Partida perfecta: termina por tiempo a los 20 s => VICTORIA y entra al top 5. */
     autoplay(0xFFFFFFFFu);
     CHECK(ctx.st == ST_GAMEOVER && ctx.result == RESULT_WIN && !stub_song_running);
-    CHECK(ctx.gs.hits == 62 && ctx.gs.misses == 0 && ctx.name_entry == 1);
+    CHECK(stub_song_ms >= AVANCE_PLAY_MS && stub_song_ms < AVANCE_PLAY_MS + 60u);
+    CHECK(ctx.gs.hits > 20 && ctx.gs.misses == 0 && ctx.name_entry == 1);
+    CHECK(strstr(stub_uart_out, "[PLAY] quedan 1 s") != NULL);
+    CHECK(strstr(stub_uart_out, "[PLAY] quedan 0 s") == NULL);
+    CHECK(strstr(stub_uart_out, "tiempo cumplido") != NULL);
 
     /* Encore: grito sostenido dentro de los primeros 5 s => +10 %. */
     {
@@ -134,9 +144,10 @@ void test_fsm(void)
     CHECK(strstr(stub_sd_records, "BAZ ") != NULL);
     frame(UI_OK);    CHECK(ctx.st == ST_MENU);
 
-    /* Derrota: sin tocar nada el rock meter llega a 0. */
+    /* Derrota: sin tocar nada el rock meter llega a 0, pero la partida dura los 20 s. */
     frame(UI_OK);  frame(UI_OK);  CHECK(ctx.st == ST_PLAY);
     while (ctx.st == ST_PLAY) frame(UI_NONE);
+    CHECK(stub_song_ms >= AVANCE_PLAY_MS);
     CHECK(ctx.st == ST_GAMEOVER && ctx.result == RESULT_LOSE && ctx.gs.rock == 0 && ctx.name_entry == 0);
     frame(UI_OK);    CHECK(ctx.st == ST_MENU);
 

@@ -5,7 +5,7 @@
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio, reducido de
  *   la consola de diagnóstico del proyecto completo (rama proyecto-final, uart_console.c).
  *
- * Teclas: 1 OK (como S1)   2 atrás/pausa (como S2)   u arriba   j abajo (como JOY_SEL)
+ * Teclas: 1 OK (como S1)   2 atrás/pausa (como S2)   u arriba   j abajo   JOY_SEL (placa) = música ON/OFF
  *         k sacudida virtual   p autoplay (juega solo la canción)
  *         s estado   o sensor de luz   d IP debouncer_axi   t interrupciones
  *         T buzzer (TTC0)   h ayuda
@@ -38,7 +38,7 @@ static const char *st_name(FsmState s)
 static void help(void)
 {
     xil_printf("\r\n--- consola del avance Sep Hero ---\r\n"
-               " 1 OK (S1)   2 atras/pausa (S2)   u arriba   j abajo (JOY_SEL)\r\n"
+               " 1 OK (S1)   2 atras/pausa (S2)   u arriba   j abajo   JOY_SEL (placa) musica ON/OFF\r\n"
                " k sacudida virtual   p autoplay on/off (en PLAY)\r\n"
                " s estado   o sensor de luz   d IP Debouncer_IP   t interrupciones   T buzzer\r\n");
 }

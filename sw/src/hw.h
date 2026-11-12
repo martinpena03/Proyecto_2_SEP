@@ -25,6 +25,8 @@ extern volatile u32 g_t1_max_us;          /* duración máxima de timer1_cb [us]
 
 /* ---- isr_handler.c: ISR de Debouncer_IP (irq_deb) ------------------------------- */
 void deb_isr(void *ref);                  /* interrupción del IP propio                  */
+extern volatile u8  g_mute_req;           /* pulsaciones de JOY_SEL (música ON / OFF)    */
+extern volatile u8  g_btn_cnt[3];         /* pulsaciones vistas por la ISR: S1, S2, JOY_SEL */
 
 /* ---- event_queues.c: colas ISR -> main ------------------------------------------- */
 void ui_push(UiEvent ev);                 /* encola un evento de interfaz                */
@@ -51,6 +53,8 @@ extern volatile u32 g_theme_changes;
 int  audio_hw_init(void);                 /* deja el buzzer en silencio                  */
 void audio_set_mute(int mute);            /* 1 = salida deshabilitada (pin quieto)       */
 int  audio_is_muted(void);
+int  audio_user_muted(void);              /* 1 = el usuario silenció con JOY_SEL         */
+void audio_user_mute_task(void);          /* desde main: atiende las pulsaciones de JOY_SEL */
 void audio_get_regs(u32 *interval, u32 *match, u32 *presc, u32 *cnt_ctrl, u32 *clk_hz);
 
 /* ---- uart_console.c: consola del avance por UART ---------------------------------- */

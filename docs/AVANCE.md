@@ -35,7 +35,8 @@ llega a la Zybo), VIO, ILA y la SD0 del PS.
     `*** [AO2] Movimiento detectado ***`.
 - **AO3: IP propio `debouncer_axi`.**
   - *Antirrebote:* sincroniza S1, S2 y JOY_SEL y solo acepta un cambio estable durante
-    `DEB_MS` ms. Guarda cada pulsación en `EDGE` (W1C) e interrumpe al GIC.
+    `DEB_MS` ms. Guarda cada pulsación en `EDGE` (W1C) e interrumpe al GIC. Cada
+    interrupción se avisa por consola: `*** [IRQ] Debouncer_IP (GIC 63): S1 -> OK ***`.
   - *LEDs:* el registro `LED_CTRL` (0x14) maneja LD0–LD3. Con el bit `THEME_LIGHT`
     activo enciende el patrón elegido por el usuario; es el habilitador del modo claro,
     que más adelante cambiará la paleta del LCD.
@@ -44,7 +45,12 @@ llega a la Zybo), VIO, ILA y la SD0 del PS.
     escribe, los relee del hardware y devuelve un código de error.
 - **AC1: máquina de estados.** INIT → MENU → (LEVEL → PLAY ↔ PAUSE → GAMEOVER |
   RECORDS | CONFIG). Al entrar a cada estado se imprime `ESTADO: X` con sus teclas.
+  Los niveles existen solo en la máquina de estados, sin música: LEVEL informa el nivel
+  elegido y PLAY imprime `Juego iniciado` y una cuenta regresiva de 20 s
+  (`[PLAY] quedan N s`, se congela en PAUSE). Al cumplirse pasa a GAMEOVER: victoria si
+  el rock meter sigue sobre 0 (con autoplay `p`), derrota si no.
 - **AC6: buzzer.** Arpegio de 4 compases a 120 BPM en loop mientras se está en el MENU.
+  JOY_SEL lo silencia o lo reanuda (`[BUZ] JOY_SEL -> musica OFF/ON`).
 
 ## Controles
 
@@ -52,8 +58,8 @@ llega a la Zybo), VIO, ILA y la SD0 del PS.
 |---|---|---|
 | S1 | `1` | OK |
 | S2 | `2` | atrás / pausa |
-| JOY_SEL | `j` | bajar el cursor |
-| — | `u` | subir el cursor |
+| JOY_SEL | — | música ON / OFF (silencio enclavado) |
+| — | `u` / `j` | subir / bajar el cursor |
 | sacudir la placa | `k` | star power (en PLAY) |
 | — | `p` | autoplay de la canción (no hay joystick) |
 | — | `s` `o` `d` `t` `T` `h` | estado, sensor de luz, IP, interrupciones, buzzer, ayuda |

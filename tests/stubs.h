@@ -23,7 +23,7 @@ extern DebCfg stub_deb_cfg;                  /* última configuración escrita a
 extern int   stub_sd_mounted;                /* lo que responde sd_init                 */
 extern int   stub_sd_saves;                  /* llamadas a sd_save_records              */
 extern char  stub_sd_records[256];           /* contenido simulado de RECORDS.TXT       */
-extern char  stub_uart_out[4096];            /* todo lo impreso por uart_hal_puts       */
+extern char  stub_uart_out[16384];            /* todo lo impreso por uart_hal_puts       */
 
 void stub_reset(void);                       /* deja todo en su valor inicial           */
 void stub_advance(u32 ms);                   /* avanza sys_ms (y song_ms si corre)      */
