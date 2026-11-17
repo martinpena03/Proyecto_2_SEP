@@ -19,6 +19,7 @@
  */
 #include "xparameters.h"
 #include "xscugic.h"
+#include "xgpio.h"
 #include "xtmrctr.h"
 #include "xil_exception.h"
 #include "xtime_l.h"
@@ -27,6 +28,7 @@
 #define IRQ_TMR0   XPAR_FABRIC_AXI_TIMER_0_INTERRUPT_INTR
 #define IRQ_TMR1   XPAR_FABRIC_AXI_TIMER_1_INTERRUPT_INTR
 #define IRQ_DEB    XPAR_FABRIC_DEBOUNCER_IP_IRQ_INTR
+#define IRQ_GPIO1  XPAR_FABRIC_AXI_GPIO_1_IP2INTC_IRPT_INTR
 
 /* Cuenta descendente con auto-recarga: el periodo es TLR + 2 ciclos del reloj AXI. */
 #define TMR_CLK_HZ      XPAR_AXI_TIMER_0_CLOCK_FREQ_HZ
@@ -41,7 +43,7 @@ static u8  g_sens_div, g_frame_div, g_opt_div;
 
 volatile u8  g_frame_flag;
 volatile u8  g_opt_poll;
-volatile u32 g_irq_cnt[3];
+volatile u32 g_irq_cnt[4];
 volatile u32 g_t1_max_us;
 
 /* ------------------------------ relojes ---------------------------------- */
@@ -98,7 +100,40 @@ void deb_isr(void *ref)
     if (e & 0x4u) { g_btn_cnt[2]++; g_mute_req++; }        /* JOY_SEL */
 }
 
-static void deb_isr_wrap(void *ref) { g_irq_cnt[2]++; deb_isr(ref); }
+/* ------------- irq_gpio: SENS_INT (axi_gpio_1): DRDY del TMP006 (AO2) ------------- */
+static XGpio gpio1;
+volatile u8  tmp_pending;
+volatile u32 g_tmp_irq;
+u8 g_tmp_bit = SENS_BIT_NONE;
+
+int gpio1_init(void)
+{
+    if (XGpio_Initialize(&gpio1, XPAR_AXI_GPIO_1_DEVICE_ID) != XST_SUCCESS) return -1;
+    XGpio_SetDataDirection(&gpio1, 1, 0xFFFFFFFFu);          /* todo entradas */
+    XGpio_InterruptEnable(&gpio1, XGPIO_IR_CH1_MASK);
+    XGpio_InterruptGlobalEnable(&gpio1);
+    return 0;
+}
+
+u32 gpio1_read(void) { return XGpio_DiscreteRead(&gpio1, 1); }
+
+/* La AXI GPIO interrumpe con cualquier cambio de sus entradas. El DRDY del TMP006 es
+ * activo en bajo (baja al terminar una conversión): solo interesa cuando el pin está en
+ * 0. La lectura por I2C la hace temp_task() desde main. */
+void gpio_isr(void *ref)
+{
+    u32 st = XGpio_InterruptGetStatus(&gpio1);
+    (void)ref;
+    XGpio_InterruptClear(&gpio1, st);
+    if (g_tmp_bit == SENS_BIT_NONE || (st & XGPIO_IR_CH1_MASK) == 0u) return;
+    if (((XGpio_DiscreteRead(&gpio1, 1) >> g_tmp_bit) & 1u) == 0u) {
+        tmp_pending = 1;
+        g_tmp_irq++;
+    }
+}
+
+static void deb_isr_wrap(void *ref)  { g_irq_cnt[2]++; deb_isr(ref); }
+static void gpio_isr_wrap(void *ref) { g_irq_cnt[3]++; gpio_isr(ref); }
 
 /* Configura el GIC y los dos timers. Devuelve 0 si todo salió bien. */
 int isr_init(GameCtx *ctx)
@@ -128,12 +163,15 @@ int isr_init(GameCtx *ctx)
     XScuGic_SetPriorityTriggerType(&gic, IRQ_TMR0, 0xA0, 0x1);
     XScuGic_SetPriorityTriggerType(&gic, IRQ_TMR1, 0xA8, 0x1);
     XScuGic_SetPriorityTriggerType(&gic, IRQ_DEB,  0xB0, 0x1);
+    XScuGic_SetPriorityTriggerType(&gic, IRQ_GPIO1, 0xB8, 0x1);
     if (XScuGic_Connect(&gic, IRQ_TMR0, (Xil_InterruptHandler)XTmrCtr_InterruptHandler, &tmr0) != XST_SUCCESS) return -3;
     if (XScuGic_Connect(&gic, IRQ_TMR1, (Xil_InterruptHandler)XTmrCtr_InterruptHandler, &tmr1) != XST_SUCCESS) return -3;
     if (XScuGic_Connect(&gic, IRQ_DEB,  (Xil_InterruptHandler)deb_isr_wrap, ctx) != XST_SUCCESS) return -3;
+    if (XScuGic_Connect(&gic, IRQ_GPIO1, (Xil_InterruptHandler)gpio_isr_wrap, ctx) != XST_SUCCESS) return -3;
     XScuGic_Enable(&gic, IRQ_TMR0);
     XScuGic_Enable(&gic, IRQ_TMR1);
     XScuGic_Enable(&gic, IRQ_DEB);
+    XScuGic_Enable(&gic, IRQ_GPIO1);
 
     Xil_ExceptionEnable();
     XTmrCtr_Start(&tmr0, 0);

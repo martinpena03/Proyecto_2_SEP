@@ -10,9 +10,9 @@
 # VERSION AVANCE (rama avance-p2): solo las conexiones del avance.
 #   PS7 (UART1, QSPI, TTC0 -> EMIO -> buzzer) + axi_timer_0/1 + axi_quad_spi_1 (ADC:
 #   acelerometro) + axi_iic_0 (OPT3001) + Debouncer_IP (botones S1/S2/JOY_SEL y
-#   LEDs LD0..LD3 del modo claro). Sin LCD, joystick, microfono, microSD, VIO/ILA ni
-#   axi_gpio_1 (el INT del OPT3001 no llega a la Zybo). El proyecto completo esta en la
-#   rama proyecto-final.
+#   LEDs LD0..LD3 del modo claro) + axi_gpio_1 (puerto SENS_INT: pines candidatos del
+#   DRDY del TMP006, interrupcion de temperatura de AO2). Sin LCD, joystick, microfono,
+#   microSD ni VIO/ILA. El proyecto completo esta en la rama proyecto-final.
 #
 # Uso (Vivado 2020.1, desde cualquier carpeta):
 #   vivado -mode batch -source hw/scripts/02_build_bd.tcl
@@ -26,6 +26,14 @@ set BD    design_1
 set JOBS  2   ;# nunca mas de 2: con mas nucleos el PC se cae
 # Vivado 2020.1 se cae (TclStackFree: incorrect freePtr) con muchas sintesis OOC multihilo.
 set_param general.maxThreads 1
+
+# Pines candidatos del DRDY del TMP006: los 8 del Pmod JA, que la tarjeta de extension no
+# ocupa. El DRDY no llega a la Zybo por la tarjeta, asi que se trae con un cable desde la
+# BoosterPack (J2.11 -> JA1); el firmware detecta en el arranque que bit lo sigue. No se
+# usan pines de JC, JD ni JE: los ocupa la tarjeta y se probo que el DRDY no llega a
+# ninguno. Mismo orden que hw/constraints/sens_int_candidates.xdc.
+set SENS_CAND {N15 L14 K16 K14 N16 L15 J16 J14}
+set SENS_W [llength $SENS_CAND]
 
 
 # ----------------------------------------------------------------------------
@@ -68,7 +76,7 @@ foreach p {PCW_ENET0_PERIPHERAL_ENABLE PCW_USB0_PERIPHERAL_ENABLE} {
 set rst [create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ps7_0_50M]
 
 set xbar [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 ps7_0_axi_periph]
-set_property CONFIG.NUM_MI {5} $xbar
+set_property CONFIG.NUM_MI {6} $xbar
 
 
 # M00: SPI del ADC (acelerometro) de la tarjeta de extensión (16 bits). El LAB10 usa SCK_RATIO = 2, pero
@@ -87,6 +95,12 @@ set iic [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_iic:2.0 axi_iic_0]
 set_property CONFIG.IIC_FREQ_KHZ {100} $iic
 
 
+# M05: GPIO de entrada con interrupcion para el DRDY del TMP006 (AO2).
+set gpio1 [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 axi_gpio_1]
+set_property -dict [list \
+    CONFIG.C_GPIO_WIDTH $SENS_W CONFIG.C_ALL_INPUTS {1} CONFIG.C_INTERRUPT_PRESENT {1} \
+] $gpio1
+
 # M02: IP propio (AO3).
 set deb [create_bd_cell -type ip -vlnv uc.cl:sephero:debouncer_axi:1.0 Debouncer_IP]
 set_property -dict [list CONFIG.G_WIDTH {3} CONFIG.G_TICKS_PER_MS {50000}] $deb
@@ -96,13 +110,13 @@ set tmr1 [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_timer:2.0 axi_timer_1]
 set tmr0 [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_timer:2.0 axi_timer_0]
 foreach t [list $tmr0 $tmr1] { set_property CONFIG.enable_timer2 {0} $t }
 
-# Concatenador de interrupciones -> IRQ_F2P[2:0].
+# Concatenador de interrupciones -> IRQ_F2P[3:0].
 set cat [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 xlconcat_0]
-set_property CONFIG.NUM_PORTS {3} $cat
+set_property CONFIG.NUM_PORTS {4} $cat
 
 
 # ----------------------------------------------------------------------------
-# AXI: maestro GP0 -> interconnect -> 5 esclavos (orden de SepHero_BD página 2)
+# AXI: maestro GP0 -> interconnect -> 6 esclavos (orden de SepHero_BD página 2)
 # ----------------------------------------------------------------------------
 connect_bd_intf_net [get_bd_intf_pins processing_system7_0/M_AXI_GP0] [get_bd_intf_pins ps7_0_axi_periph/S00_AXI]
 set slaves {
@@ -111,6 +125,7 @@ set slaves {
     Debouncer_IP/s00_axi
     axi_timer_1/S_AXI
     axi_timer_0/S_AXI
+    axi_gpio_1/S_AXI
 }
 set i 0
 foreach s $slaves {
@@ -125,15 +140,15 @@ set clk_pins [list \
     processing_system7_0/M_AXI_GP0_ACLK rst_ps7_0_50M/slowest_sync_clk \
     ps7_0_axi_periph/ACLK ps7_0_axi_periph/S00_ACLK \
     axi_quad_spi_1/s_axi_aclk axi_quad_spi_1/ext_spi_clk \
-    axi_iic_0/s_axi_aclk \
+    axi_iic_0/s_axi_aclk axi_gpio_1/s_axi_aclk \
     axi_timer_0/s_axi_aclk axi_timer_1/s_axi_aclk \
     Debouncer_IP/s00_axi_aclk]
 set rst_pins [list \
     ps7_0_axi_periph/S00_ARESETN \
-    axi_quad_spi_1/s_axi_aresetn axi_iic_0/s_axi_aresetn \
+    axi_quad_spi_1/s_axi_aresetn axi_iic_0/s_axi_aresetn axi_gpio_1/s_axi_aresetn \
     axi_timer_0/s_axi_aresetn axi_timer_1/s_axi_aresetn \
     Debouncer_IP/s00_axi_aresetn]
-for {set i 0} {$i < 5} {incr i} {
+for {set i 0} {$i < 6} {incr i} {
     lappend clk_pins ps7_0_axi_periph/M0${i}_ACLK
     lappend rst_pins ps7_0_axi_periph/M0${i}_ARESETN
 }
@@ -147,11 +162,12 @@ connect_bd_net [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_pins rst
 connect_bd_net [get_bd_pins rst_ps7_0_50M/interconnect_aresetn] [get_bd_pins ps7_0_axi_periph/ARESETN]
 
 # ----------------------------------------------------------------------------
-# Interrupciones: xlconcat_0 -> IRQ_F2P[2:0] (ID del GIC 61..63)
+# Interrupciones: xlconcat_0 -> IRQ_F2P[3:0] (ID del GIC 61..64)
 # ----------------------------------------------------------------------------
 connect_bd_net -net irq_t0 [get_bd_pins axi_timer_0/interrupt]      [get_bd_pins xlconcat_0/In0]   ;# 61: 1 ms
 connect_bd_net -net irq_t1 [get_bd_pins axi_timer_1/interrupt]      [get_bd_pins xlconcat_0/In1]   ;# 62: 2 ms
 connect_bd_net -net irq_deb [get_bd_pins Debouncer_IP/irq]        [get_bd_pins xlconcat_0/In2]   ;# 63: botones
+connect_bd_net -net irq_gpio [get_bd_pins axi_gpio_1/ip2intc_irpt]    [get_bd_pins xlconcat_0/In3]   ;# 64: TMP_DRDY
 connect_bd_net -net IRQ_F2P [get_bd_pins xlconcat_0/dout]            [get_bd_pins processing_system7_0/IRQ_F2P]
 
 # ----------------------------------------------------------------------------
@@ -175,6 +191,10 @@ connect_bd_net -net btn_raw [get_bd_ports btn_raw] [get_bd_pins Debouncer_IP/btn
 create_bd_port -dir O -from 3 -to 0 leds
 connect_bd_net [get_bd_ports leds] [get_bd_pins Debouncer_IP/leds]
 
+# DRDY del TMP006 -> axi_gpio_1 (8 pines candidatos del Pmod JA; el firmware elige el bit).
+create_bd_port -dir I -from [expr {$SENS_W - 1}] -to 0 SENS_INT
+connect_bd_net -net SENS_INT [get_bd_ports SENS_INT] [get_bd_pins axi_gpio_1/gpio_io_i]
+
 
 # ----------------------------------------------------------------------------
 # Mapa de direcciones (SepHero_BD página 2)
@@ -184,6 +204,7 @@ proc sephero_addr {seg off} {
         -target_address_space [get_bd_addr_spaces processing_system7_0/Data] \
         [get_bd_addr_segs $seg] -force
 }
+sephero_addr axi_gpio_1/S_AXI/Reg          0x41210000
 sephero_addr axi_iic_0/S_AXI/Reg           0x41600000
 sephero_addr axi_quad_spi_1/AXI_LITE/Reg   0x41E10000
 sephero_addr axi_timer_0/S_AXI/Reg         0x42800000
@@ -206,6 +227,8 @@ set_property top ${BD}_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
 add_files -fileset constrs_1 -norecurse $ROOT/hw/constraints/sephero.xdc
+# Candidatos del DRDY del TMP006 (archivo fijo: generarlo en el build dejo un .xdc vacio).
+add_files -fileset constrs_1 -norecurse $ROOT/hw/constraints/sens_int_candidates.xdc
 
 launch_runs impl_1 -to_step write_bitstream -jobs $JOBS
 wait_on_run impl_1

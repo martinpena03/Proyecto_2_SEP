@@ -1,16 +1,3 @@
-/*
- * debouncer_ip.c - Driver del IP propio debouncer_axi (AO3).
- *
- * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
- * Fuente: diseño propio (docs/MANUAL_IMPLEMENTACION.md §8.2); acceso a registros con
- *   Xil_In32 / Xil_Out32 como en alarma.c de la AYU10 (IP BUZZER_AXI).
- *
- * debouncer_init() es la "función con argumentos de punteros que inicializa y configura
- * el hardware" que pide AO3: recibe la instancia (Debouncer *) y la configuración que el
- * usuario entregó por la consola UART (const DebCfg *).
- *
- * Mapa de registros: ver hw/ip_repo/debouncer_axi/src/debouncer_axi.vhd.
- */
 #include "xil_io.h"
 #include "xparameters.h"
 #include "interfaces.h"
@@ -21,12 +8,12 @@
 #define DEB_BTNMASK   0x08u
 #define DEB_STATE     0x0Cu
 #define DEB_EDGE      0x10u
-#define DEB_LEDCTRL   0x14u       /* [3:0] patrón de LEDs, [4] THEME_LIGHT (modo claro) */
+#define DEB_LEDCTRL   0x14u       /* leds para el modo claro*/
 #define LED_THEME     (1u << 4)
 #define CTRL_EN       (1u << 0)
 #define CTRL_IRQ_EN   (1u << 1)
 #define CTRL_INV      (1u << 2)
-#define BTN_ACTIVE_LOW 1          /* S1, S2 y JOY_SEL de la Booster: activos en bajo */
+#define BTN_ACTIVE_LOW 1
 
 #define DEB_WR(d, off, v)  Xil_Out32((d)->base + (off), (u32)(v))
 #define DEB_RD(d, off)     Xil_In32((d)->base + (off))
@@ -40,7 +27,7 @@ int debouncer_init(Debouncer *dev, const DebCfg *cfg)
     if (debcfg_validate(cfg) != 0) return -2;
     dev->base = DEB_BASE;
     dev->cfg  = *cfg;
-    /* dev->light no se toca: el tema lo decide el sensor de luz, no la consola. */
+    /* dev->light no se toca por consola, se ve segun la luz nomas  */
     DEB_WR(dev, DEB_CTRL, 0);                           /* detener mientras se configura */
     DEB_WR(dev, DEB_DEB_MS, cfg->deb_ms);
     DEB_WR(dev, DEB_BTNMASK, cfg->btn_mask & 0x7u);
@@ -53,8 +40,8 @@ int debouncer_init(Debouncer *dev, const DebCfg *cfg)
     return 0;
 }
 
-/* Habilita (light = 1) o deshabilita el modo claro: el IP enciende LD0..LD3 con el patrón
- * configurado. Lo llama la máquina de estados cuando la interrupción del OPT3001 cambia
+/* Habilita (light = 1) o deshabilita el modo claro,
+ * lo llama la máquina de estados cuando la interrupcion del sensor de luz cambia
  * el tema; más adelante el mismo bit elegirá la paleta clara del LCD. */
 void debouncer_set_theme(Debouncer *dev, int light)
 {

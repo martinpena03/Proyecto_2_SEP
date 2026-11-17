@@ -1,22 +1,7 @@
-/*
- * uart_config.c - Configuración por la consola UART del PC (UART_config, AO3).
- *
- * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
- * Fuente: basado en la consola de la AYU09 (helloworld.c: menú por UART con lectura de
- *   enteros), reescrito como lector de línea NO bloqueante para que la máquina de
- *   estados siga corriendo y S2 pueda cancelar (docs/MANUAL_IMPLEMENTACION.md §8.7).
- *
- * Portable: solo usa uart_hal_getc() / uart_hal_puts() (uart1.c en la placa, stubs
- * en el PC). No usa printf ni scanf.
- *
- * El usuario entrega 4 parámetros: DEB_MS, BTN_MASK y LED_PATTERN (van al IP propio por
- * debouncer_init) y UMBRAL_SHAKE (accelerometer_aconditioner.c).
- */
 #include "interfaces.h"
 
 #define N_STEPS 4u
 
-/* ----------------------- utilidades de formato (sin printf) ----------------------- */
 
 char *fmt_str(char *dst, const char *s)
 {

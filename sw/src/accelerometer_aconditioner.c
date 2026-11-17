@@ -22,13 +22,13 @@
 
 static u16 g_cpg = 200;             /* cuentas por g                                   */
 static u16 g_shake_mg = 800;
-static u16 g_acc[3];                /* última lectura (consola)                        */
+static u16 g_acc[3];                /* ultima lectura (consola)                        */
 static u8  g_shake_run;             /* muestras seguidas sobre el umbral               */
-static u32 g_shake_last;            /* sys_ms del último movimiento                    */
-static volatile u32 g_motion_cnt;   /* lo incrementa la ISR; main imprime el aviso      */
+static u32 g_shake_last;            /* sys_ms del ultimo movimiento                    */
+static volatile u32 g_motion_cnt;   /* lo incrementa la ISR y el main imprime el aviso      */
 static volatile u16 g_motion_mg;
 
-/* Raíz cuadrada entera. */
+/* Calculamos la raiz para calcular la magnitud de la aceleracion para el boost */
 static u32 isqrt32(u32 v)
 {
     u32 r = 0, b = 1u << 30;
@@ -40,11 +40,11 @@ static u32 isqrt32(u32 v)
     }
     return r;
 }
+/* microfonos*/
 
 void sensors_set_shake_threshold(u16 mg) { g_shake_mg = mg; }
 u32  sensors_motion_count(void)          { return g_motion_cnt; }
 u16  sensors_last_motion_mg(void)        { return g_motion_mg; }
-/* Sin micrófono en el avance: el público queda en 0 (el bonus encore no se activa). */
 u8   sensors_crowd_level(void)           { return 0u; }
 
 void sensors_acc_debug(u16 *acc, u16 *cpg, u32 *shakes)
@@ -53,7 +53,7 @@ void sensors_acc_debug(u16 *acc, u16 *cpg, u32 *shakes)
     *cpg = g_cpg; *shakes = g_motion_cnt;
 }
 
-/* Calibración en reposo ("no mover la placa"), antes de habilitar las interrupciones. */
+/* Calibracion del censor de acelaracion */
 int sensors_acc_init(void)
 {
     static const u8 ch[3] = { ADC_CH_ACX, ADC_CH_ACY, ADC_CH_ACZ };
@@ -72,14 +72,13 @@ int sensors_acc_init(void)
     sx /= 64; sy /= 64; sz /= 64;
     mag = isqrt32((u32)(sx * sx + sy * sy + sz * sz));
     g_acc[0] = v[0]; g_acc[1] = v[1]; g_acc[2] = v[2];
-    /* 1 g debería dar ~200 cuentas (660 mV/g con 3,3 V y 10 bits). Fuera de un rango
-     * razonable se deja el valor nominal y se informa el error. */
+
     if (mag < 100u || mag > 320u) { g_cpg = 200; return -1; }
     g_cpg = (u16)mag;
     return 0;
 }
 
-/* Desde la ISR de axi_timer_1 (cada 10 ms). */
+/* Desde la ISR de axi_timer_1 cada 10 ms. */
 void sensors_acc_sample(void)
 {
     static const u8 ch[3] = { ADC_CH_ACX, ADC_CH_ACY, ADC_CH_ACZ };
@@ -103,7 +102,7 @@ void sensors_acc_sample(void)
         u32 a_mg = isqrt32((u32)(lhs / 1000000u)) * 1000u / g_cpg;
         g_shake_last = now;
         g_motion_mg = (u16)((a_mg > 1000u) ? (a_mg - 1000u) : 0u);
-        g_motion_cnt++;                                    /* AO2: evento de movimiento */
-        ui_push(UI_SHAKE);                                 /* en PLAY: star power       */
+        g_motion_cnt++;
+        ui_push(UI_SHAKE);
     }
 }

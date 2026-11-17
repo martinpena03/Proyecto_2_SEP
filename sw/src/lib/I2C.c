@@ -1,24 +1,10 @@
-/*
- * I2C.c - Maestro I2C (AXI IIC) y acceso básico al sensor de luz OPT3001.
- *
- * Origen: I2C.c de la AYU10 (I2C_BUZZER/sw/comun), a su vez basado en el del
- * Proyecto_Base_Booster del LAB10.
- * Cambios de Sep Hero:
- *   - init_IIC() ya no llama a init_platform() ni configura el TMP006 (no se usa);
- *     ahora revisa los códigos de retorno.
- *   - se agregan opt_read_reg() / opt_write_reg() públicos, que usa opt3001.c para
- *     escribir CONFIG, LOW_LIMIT y HIGH_LIMIT (AO1: modificar >= 2 registros).
- * Se conservan init_OPT() y read_opt() del curso.
- *
- * Regla del proyecto: el I2C se usa SOLO desde main (nunca desde una ISR).
- */
 #include "I2C.h"
 
 XIic  iic;
 static u8 SendBuffer[3];
 static u8 RecvBuffer[2];
-float Lux;                                  /* iluminación en lux (última lectura)     */
-u16 OPT_raw;                                /* último registro RESULT leído            */
+float Lux;
+u16 OPT_raw;
 
 int init_IIC()
 {
@@ -29,7 +15,7 @@ int init_IIC()
     return XST_SUCCESS;
 }
 
-/* Lee un registro de 16 bits del OPT3001 (MSB primero). */
+/* Leer sensor de luz */
 u16 opt_read_reg(u8 reg)
 {
     SendBuffer[0] = reg;
@@ -38,7 +24,7 @@ u16 opt_read_reg(u8 reg)
     return (u16)((RecvBuffer[0] << 8) | RecvBuffer[1]);
 }
 
-/* Escribe un registro de 16 bits del OPT3001. Devuelve 0 si se enviaron los 3 bytes. */
+/* escribe un registro del sensor de luz */
 int opt_write_reg(u8 reg, u16 val)
 {
     SendBuffer[0] = reg;
@@ -49,19 +35,17 @@ int opt_write_reg(u8 reg, u16 val)
 
 int init_OPT()
 {
-    /* Escribe 0xC410 en el registro de configuración 0x01 y lo relee para confirmar
-     * que quedó. Si la escritura se pierde, el OPT3001 sigue en su modo por defecto
-     * (shutdown) y el resultado queda siempre en 0 lux. */
+
     u16 id, leido;
     int intento;
 
-    id = opt_read_reg(0x7E);                                    /* MANUFACTURER ID: 0x5449 ("TI") */
-    xil_printf("OPT3001: ID fabricante = 0x%04x (esperado 0x5449)\r\n", id);
+    id = opt_read_reg(0x7E);
+    xil_printf("Sensor de luz inicializado \r\n");
     for (intento = 0; intento < 5; intento++) {
         (void)opt_write_reg(0x01, 0xC410);
         leido = opt_read_reg(0x01);
         xil_printf("OPT3001: config leida = 0x%04x\r\n", leido);
-        if ((leido & 0xFE00) == 0xC400) {                       /* bits 8..0: banderas y modo */
+        if ((leido & 0xFE00) == 0xC400) {
             return XST_SUCCESS;
         }
     }
@@ -70,8 +54,8 @@ int init_OPT()
 
 float read_opt()
 {
-    OPT_raw = opt_read_reg(0x00);                               /* RESULT */
-    /* lux = 0.01 * 2^E * R, con E = bits 15..12 (exponente) y R = bits 11..0 (mantisa) */
+    OPT_raw = opt_read_reg(0x00);
+    /* lAplicamos la formula del enunciado para la luz  */
     Lux = 0.01f * (float)(1u << (OPT_raw >> 12)) * (float)(OPT_raw & 0x0FFF);
     return Lux;
 }

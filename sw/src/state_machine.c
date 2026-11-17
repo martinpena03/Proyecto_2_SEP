@@ -57,7 +57,7 @@ static void load_selected_song(GameCtx *ctx)
 
     ctx->song_ok = (u8)(r > 0);
     buzzer_stop(&ctx->bz);                       /* la melodía del menú no sigue aquí */
-    p = fmt_str(p, "   [LEVEL] nivel ");
+    p = fmt_str(p, "   [LEVEL]  ");
     p = fmt_u32(p, (u32)ctx->song_sel + 1u);
     p = fmt_str(p, "/");
     p = fmt_u32(p, N_SONGS);
@@ -66,7 +66,7 @@ static void load_selected_song(GameCtx *ctx)
         p = fmt_str(p, ctx->song.name);
         p = fmt_str(p, " (");
         p = fmt_u32(p, ctx->song.n);
-        p = fmt_str(p, " notas, sin musica en el avance)\r\n");
+        p = fmt_str(p, " Musica de juego pendiente\r\n");
     } else {
         p = fmt_str(p, ": error de carga\r\n");
     }
@@ -78,7 +78,7 @@ static void announce_countdown(u8 left)
 {
     char b[48];
     char *p = b;
-    p = fmt_str(p, "   [PLAY] quedan ");
+    p = fmt_str(p, "   [Jugando] quedan ");
     p = fmt_u32(p, left);
     p = fmt_str(p, " s\r\n");
     uart_hal_puts(b);
@@ -97,17 +97,17 @@ static int score_qualifies(const GameCtx *ctx, u32 score)
 static void announce_state(FsmState s)
 {
     static const char *const NAME[] = {
-        "INIT", "MENU", "LEVEL (seleccion de cancion)", "PLAY (jugando)", "PAUSE",
-        "GAMEOVER", "RECORDS", "CONFIG (parametros por UART)" };
+        "INIT", "MENU", "LEVEL ", " [jugando]", "[Pausa]",
+        "GAMEOVER", "RECORDS", "CONFIGURACION" };
     static const char *const HINT[] = {
-        "inicio; pasa solo al MENU en 1,5 s",
-        "u/j mueve el cursor (Jugar, Records, Configurar), 1 (o S1) entra, JOY_SEL = musica ON/OFF",
-        "u/j cambia el nivel (sin musica), 1 (o S1) juega, 2 (o S2) vuelve al MENU",
-        "20 s de partida; p = autoplay, sacudir la placa = star power, 2 (o S2) = PAUSE",
-        "u/j elige (Continuar, Reiniciar, Salir), 1 confirma, 2 continua",
+        "inicio",
+        "1 para continuar, JOY_SEL para musica ON/OFF",
+        "u/j navegacion, 1 para jugar, 2 para volver al menu",
+        "20 s de partida, para PAUSE",
+        "u/j navegacion: Continuar, Reiniciar, Salir, 1 aceptar, 2 continua",
         "1 o 2 vuelve al MENU",
         "1 o 2 vuelve al MENU",
-        "escribir los valores y Enter; S2 en la placa cancela" };
+        "escribe los valores y presiona enter, 2 para salir" };
     char b[200];
     char *p = b;
     u8 i = ((unsigned)s < 8u) ? (u8)s : 0u;
@@ -172,7 +172,6 @@ static void enter_state(GameCtx *ctx, FsmState ns)
     }
 }
 
-/* Partida nueva (desde la selección o "Reiniciar"). */
 static void start_game(GameCtx *ctx)
 {
     game_reset(&ctx->gs);
@@ -192,9 +191,7 @@ static void resume_game(GameCtx *ctx)
     enter_state(ctx, ST_PLAY);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Interfaz pública                                                           */
-/* -------------------------------------------------------------------------- */
+
 
 /* Arranque: monta la SD (o activa el respaldo), carga los récords y muestra el logo. */
 void fsm_start(GameCtx *ctx)
@@ -224,12 +221,12 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
     ctx->gs.crowd = sensors_crowd_level();
 
     switch (ctx->st) {
-    /* ------------------------------------------------------------------ INIT */
+    /*  INIT */
     case ST_INIT:
         if (now_sys - ctx->t_state >= 1500u) enter_state(ctx, ST_MENU);
         break;
 
-    /* ------------------------------------------------------------------ MENU */
+    /*  MENU */
     case ST_MENU:
         if (ev == UI_UP)        ctx->cursor = (u8)((ctx->cursor + MENU_ITEMS - 1u) % MENU_ITEMS);
         else if (ev == UI_DOWN) ctx->cursor = (u8)((ctx->cursor + 1u) % MENU_ITEMS);
@@ -240,12 +237,12 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         }
         break;
 
-    /* --------------------------------------------------------------- RECORDS */
+    /*  RECORDS */
     case ST_RECORDS:
         if (ev == UI_BACK || ev == UI_OK) enter_state(ctx, ST_MENU);
         break;
 
-    /* ---------------------------------------------------------------- CONFIG */
+    /*   CONFIG */
     case ST_CONFIG: {
         DebCfg ncfg;
         if (uart_cfg_poll(&ctx->ucfg, &ncfg) == 1) {
@@ -258,7 +255,7 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         break;
     }
 
-    /* ----------------------------------------------------------------- LEVEL */
+    /*  LEVEL */
     case ST_LEVEL:
         if (ev == UI_UP || ev == UI_DOWN) {
             if (ev == UI_DOWN) ctx->song_sel = (u8)((ctx->song_sel + 1u) % N_SONGS);
@@ -272,7 +269,7 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         }
         break;
 
-    /* ------------------------------------------------------------------ PLAY */
+    /*   PLAY */
     case ST_PLAY: {
         Hit h;
         u32 now;
@@ -282,8 +279,7 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         now = clock_song_ms();
         game_update(&ctx->gs, &ctx->song, now);                              /* 2.o el tiempo  */
 
-        /* Avance: la partida dura AVANCE_PLAY_MS de reloj de canción (se congela en
-         * PAUSE). Cada segundo se imprime cuánto falta; no hay sonido en el nivel. */
+        /* por ahora la partida dura AVANCE_PLAY_MS en cada segundo se imprime cuanto falta y no hay sonido en el nivel. */
         if (now < AVANCE_PLAY_MS) {
             u8 left = (u8)((AVANCE_PLAY_MS - now + 999u) / 1000u);
             if (left != ctx->count_shown) {
@@ -299,8 +295,7 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
             break;
         }
 
-        /* Fin por tiempo: gana si el rock meter sigue sobre 0 (las reglas de
-         * game_manager.c siguen corriendo; con autoplay se gana, sin tocar se pierde). */
+
         res = (now >= AVANCE_PLAY_MS) ? ((ctx->gs.rock > 0) ? RESULT_WIN : RESULT_LOSE) : RESULT_NONE;
         if (res != RESULT_NONE) {
             uart_hal_puts("   [PLAY] tiempo cumplido: fin de la partida\r\n");
@@ -310,7 +305,7 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         break;
     }
 
-    /* ----------------------------------------------------------------- PAUSE */
+    /* PAUSE */
     case ST_PAUSE:
         if (ev == UI_UP)        ctx->cursor = (u8)((ctx->cursor + PAUSE_ITEMS - 1u) % PAUSE_ITEMS);
         else if (ev == UI_DOWN) ctx->cursor = (u8)((ctx->cursor + 1u) % PAUSE_ITEMS);
@@ -325,9 +320,9 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         }
         break;
 
-    /* -------------------------------------------------------------- GAMEOVER */
+    /* GAMEOVER */
     case ST_GAMEOVER:
-        /* Bonus encore: un grito sostenido durante los primeros 5 s. */
+        /* Bonus un gritosube puntaje por 5seg*/
         if (!ctx->gs.encore_done && ctx->rec_pos < 0 && (now_sys - ctx->t_state) <= ENCORE_WIN_MS) {
             if (ctx->gs.crowd >= ENCORE_LEVEL) {
                 if (++ctx->encore_cnt >= ENCORE_FRAMES) {
@@ -342,7 +337,7 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
             }
         }
 
-        if (ctx->name_entry) {                       /* ingreso de iniciales al top 5 */
+        if (ctx->name_entry) {                       /* ingreso de iniciales*/
             char *c = &ctx->name[ctx->name_pos];
             if (ev == UI_UP)        *c = (char)((*c == 'Z') ? 'A' : *c + 1);
             else if (ev == UI_DOWN) *c = (char)((*c == 'A') ? 'Z' : *c - 1);

@@ -6,12 +6,15 @@
  *   de ADC / I2C sigue el main.c del Proyecto_Base_Booster (LAB10).
  *
  * El avance no dibuja nada: todo se muestra por la UART y con los LEDs LD0..LD3.
- *   AO2: interrupciones de axi_timer_0/1; el acelerómetro se lee en la ISR de timer1
+ *   AO2: interrupciones de axi_timer_0/1 y del sensor de temperatura: el DRDY del TMP006
+ *        llega a axi_gpio_1 (GIC 64) y se imprime la temperatura al llegar a
+ *        TEMP_ALERT_C (26 °C, hw.h). Además, el acelerómetro se lee en la ISR de timer1
  *        ("Movimiento detectado") y el OPT3001 se revisa cada 200 ms ("Mucha luz").
  *   AO3: IP propio debouncer_axi (botones + LEDs del modo claro), configurado por UART
  *        con debouncer_init(Debouncer *, const DebCfg *).
  *   AC1: máquina de estados; cada estado se anuncia por consola.
- *   AC6: melodía del menú en el buzzer (TTC0); JOY_SEL la silencia o la reanuda.
+ *   AC6: melodía del menú en el buzzer (TTC0). Parte en silencio; JOY_SEL la enciende
+ *        o la apaga.
  * Los niveles solo existen en la máquina de estados (sin música): PLAY imprime
  * "Juego iniciado" y una cuenta regresiva de 20 s antes de pasar a GAMEOVER.
  */
@@ -39,7 +42,7 @@ static void report(const char *what, int code)
 static void init_all(GameCtx *c)
 {
     static const Opt3001Cfg optcfg = { OPT_LO_LUX, OPT_HI_LUX };
-    int r;
+    int r, r_iic;
 
     init_platform();
     r = audio_hw_init();                             /* lo primero: buzzer en silencio */
@@ -51,12 +54,18 @@ static void init_all(GameCtx *c)
     report("ADC SPI", r);
     report("acelerometro", sensors_acc_init());
 
-    /* I2C + sensor de luz. Si falla, el tema queda fijo en oscuro. */
-    r = (init_IIC() == XST_SUCCESS) ? 0 : -1;
-    report("I2C", r);
-    if (r == 0) r = opt3001_init(&optcfg);
+    /* I2C + sensores de luz y temperatura. Sin sensor de luz el tema queda fijo en
+     * oscuro. axi_gpio_1 va antes del TMP006 para buscar en qué pin llega su DRDY; si no
+     * aparece, no hay interrupción de temperatura (AO2). */
+    report("GPIO SENS_INT", gpio1_init());
+    r_iic = (init_IIC() == XST_SUCCESS) ? 0 : -1;
+    report("I2C", r_iic);
+    r = (r_iic == 0) ? opt3001_init(&optcfg) : -1;
     report("OPT3001", r);
     theme_init(r == 0, &optcfg);
+    r = (r_iic == 0) ? tmp006_init() : -1;
+    report("TMP006", r);
+    g_tmp_bit = (r == 0) ? tmp006_detect_drdy(SENS_BIT_NONE) : SENS_BIT_NONE;
 
     /* IP propio con la configuración por defecto (se cambia desde CONFIG por la UART). */
     debcfg_default(&c->cfg);
@@ -99,15 +108,17 @@ static void btn_task(void)
 int main(void)
 {
     init_all(&ctx);
-    xil_printf("\r\n--- AVANCE: AO2 (luz + acelerometro por interrupcion de timer), AO3 (Debouncer_IP + LEDs del modo claro),\r\n"
+    xil_printf("\r\n--- AVANCE: AO2 (timers + interrupcion del TMP006), AO3 (Debouncer_IP + LEDs del modo claro),\r\n"
                "    AC1 (maquina de estados por consola), AC6 (melodia del menu) ---\r\n"
-               "    Luz: oscuro < %d lux, claro > %d lux. Botones: S1 = OK, S2 = atras, JOY_SEL = musica ON/OFF. 'h' = ayuda.\r\n"
+               "    Temperatura: DRDY en %s, aviso al llegar a %d C. Luz: oscuro < %d lux, claro > %d lux.\r\n"
+               "    Botones: S1 = OK, S2 = atras, JOY_SEL = musica ON/OFF (parte en OFF). 'h' = ayuda.\r\n"
                "    Los niveles no tienen musica: PLAY dura 20 s con cuenta regresiva por consola.\r\n",
-               OPT_LO_LUX, OPT_HI_LUX);
+               sens_cand_name(g_tmp_bit), TEMP_ALERT_C, OPT_LO_LUX, OPT_HI_LUX);
     fsm_start(&ctx);                             /* canciones embebidas y estado INIT */
 
     while (1) {
-        theme_task();                            /* OPT3001 por I2C cada 200 ms (AO2) */
+        temp_task();                             /* TMP006 por I2C tras su DRDY (AO2) */
+        theme_task();                            /* OPT3001 por I2C cada 200 ms       */
         motion_task();                           /* aviso del acelerómetro (AO2)      */
         btn_task();                              /* aviso de los botones (irq_deb)    */
         audio_user_mute_task();                  /* JOY_SEL: música ON / OFF          */

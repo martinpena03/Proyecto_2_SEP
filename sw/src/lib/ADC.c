@@ -1,14 +1,4 @@
-/*
- * ADC.c - Lectura del ADC SPI multicanal de la tarjeta de extension (joystick,
- * acelerometro, microfono y potenciometros), por axi_quad_spi_1.
- *
- * Origen: ADC.c del LAB10 2026-2 (Proyecto_Base_Booster), sin cambios en las funciones
- * read_*() del curso. Agregado de Sep Hero (al final del archivo):
- *   - adc_read_raw(ch): lectura generica de un canal con el mismo patron del curso;
- *   - adc_read_chain(): lee varios canales en rafaga encadenada (n + 1 transferencias
- *     en vez de 2n), para acortar la interrupcion de 2 ms.
- * Se quito el xil_printf de init_adc() (ensuciaba la consola).
- */
+
 #include "ADC.h"
 XSpi SpiInstance1;
 typedef u8 DataBuffer[BUFFER_SIZE_ADC];
@@ -153,12 +143,11 @@ static u16 adc_xfer(u8 next_ch)
 {
 	u8 tx[BUFFER_SIZE_ADC];
 	u8 rx[BUFFER_SIZE_ADC] = { 0, 0 };
-	tx[0] = (u8)(next_ch << 3);                 /* el canal va en los bits 5:3 */
+	tx[0] = (u8)(next_ch << 3);                 /*canal en los bits 5:3 */
 	tx[1] = (u8)(next_ch << 3);
 	XSpi_Transfer(&SpiInstance1, tx, rx, BUFFER_SIZE_ADC);
 #ifdef ADC_SHIFT1
-	/* Parche temporal para el bitstream con SCK_RATIO = 2: el dato llega corrido un
-	 * bit a la derecha y el bit superior es basura. */
+	/* Parche temporal para el bitstream con SCK_RATIO = 2 (el dato llega corrido un bit a la derecha). */
 	return (u16)(((rx[0] + rx[1] * 256) >> 1) & 0x3FFu);
 #else
 	return (u16)((rx[0] + rx[1] * 256) / 4);    /* misma formula del curso */
@@ -172,7 +161,7 @@ u16 adc_read_raw(u8 ch)
 	return adc_xfer(ch);
 }
 
-/* Lee n canales encadenados: mientras se recibe el canal k se pide el k+1. */
+/* Lee n canales encadenados, para que mientras se recibe el canal k se pide el k+1. */
 void adc_read_chain(const u8 *ch, u8 n, u16 *out)
 {
 	u8 k;

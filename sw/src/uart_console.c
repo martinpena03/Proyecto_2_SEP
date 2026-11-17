@@ -72,10 +72,14 @@ static void dump_timers(void)
 {
     u16 acc[3], cpg;
     u32 shakes;
+    s32 t = tmp006_last_cc();
     sensors_acc_debug(acc, &cpg, &shakes);
-    xil_printf("[IRQ] sys_ms=%d timer0=%d timer1=%d debouncer=%d | timer1_cb max=%d us | acc=(%d,%d,%d) cpg=%d movimientos=%d\r\n",
-               (int)clock_sys_ms(), (int)g_irq_cnt[0], (int)g_irq_cnt[1], (int)g_irq_cnt[2],
+    xil_printf("[IRQ] sys_ms=%d timer0=%d timer1=%d debouncer=%d gpio=%d | timer1_cb max=%d us | acc=(%d,%d,%d) cpg=%d movimientos=%d\r\n",
+               (int)clock_sys_ms(), (int)g_irq_cnt[0], (int)g_irq_cnt[1], (int)g_irq_cnt[2], (int)g_irq_cnt[3],
                (int)g_t1_max_us, acc[0], acc[1], acc[2], cpg, (int)shakes);
+    xil_printf("[TMP] DRDY en %s, %d interrupciones, ultima T = %s%d.%02d C (aviso a %d C)\r\n",
+               sens_cand_name(g_tmp_bit), (int)g_tmp_irq, (t < 0) ? "-" : "",
+               (int)((t < 0 ? -t : t) / 100), (int)((t < 0 ? -t : t) % 100), TEMP_ALERT_C);
     g_t1_max_us = 0;
 }
 

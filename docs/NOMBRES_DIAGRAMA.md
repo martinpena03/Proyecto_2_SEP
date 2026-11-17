@@ -9,22 +9,24 @@ faltan están en la rama `proyecto-final` con los mismos nombres.
 
 | Bloque del diagrama | Celda del block design | Señales del diagrama (redes y puertos) |
 |---|---|---|
-| Debouncer_IP | `Debouncer_IP` (IP propio `debouncer_axi`) | puerto `btn_raw[2:0]`, red `irq_deb` |
+| Debouncer_IP | `Debouncer_IP` (IP propio `debouncer_axi`) | puertos `btn_raw[2:0]` y `leds[3:0]` (LD0–LD3), red `irq_deb` |
 | axi_quad_spi_1 | `axi_quad_spi_1` | `spi_rtl` (ADC SPI, solo acelerómetro) |
-| axi_iic_0 | `axi_iic_0` | `iic_rtl` (I²C del OPT3001) |
+| axi_iic_0 | `axi_iic_0` | `iic_rtl` (I²C del OPT3001 y del TMP006) |
+| axi_gpio_1 | `axi_gpio_1` | puerto `SENS_INT[7:0]` (DRDY del TMP006), red `irq_gpio` |
 | axi_timer_0 · 1 ms | `axi_timer_0` | red `irq_t0` |
 | axi_timer_1 · 2 ms | `axi_timer_1` | red `irq_t1` |
 | GIC | GIC del PS (`processing_system7_0`) | red `IRQ_F2P` (de `xlconcat_0`) |
 | UART1, TTC0 | periféricos del PS (`processing_system7_0`) | |
 | EMIO | EMIO del PS | red `TTC0_WAVE0_OUT` → puerto `BUZZER_PWM` |
 
-No están en el avance: `axi_gpio_1` (OPT_INT), `axi_quad_spi_0` + `axi_gpio_0` (LCD) y SDIO0.
+No están en el avance: `axi_quad_spi_0` + `axi_gpio_0` (LCD) y SDIO0.
 
 ## ARM (`sw/src/`)
 
 | Bloque del diagrama | Archivos |
 |---|---|
-| ISR_handler | `isr_handler.c` (GIC, timers, ISR de `irq_deb`) |
+| ISR_handler | `isr_handler.c` (GIC, timers, ISR de `irq_deb` e `irq_gpio`) |
+| Temperature_aconditioner | `temperature_aconditioner.c` (TMP006 por I²C, interrupción del DRDY, aviso a `TEMP_ALERT_C`) |
 | Accelerometer_aconditioner | `accelerometer_aconditioner.c` |
 | Light_aconditioner | `light_aconditioner.c` (OPT3001 por I²C, revisado cada 200 ms) |
 | State_Machine | `state_machine.c`, `state_machine.h` |

@@ -20,7 +20,6 @@ int read_POT1();
 int read_POT2();
 int read_MIC();
 
-/* Agregado de Sep Hero: canales y lecturas genericas (ver ADC.c). */
 #define ADC_CH_JOYX 0u
 #define ADC_CH_JOYY 1u
 #define ADC_CH_ACX  2u

@@ -21,7 +21,7 @@
 #include "hw.h"
 
 static XTtcPs ttc;                 /* TTC0, contador 0 -> TTC0_WAVE0_OUT */
-static volatile u8 g_mute = SEP_MUTE;
+static volatile u8 g_mute = (SEP_MUTE || MUSIC_START_MUTED);   /* parte en silencio */
 static u8 g_ready;
 
 /* Opciones con sonido: intervalo + match + polaridad (onda habilitada). */
@@ -52,10 +52,11 @@ int audio_hw_init(void)
 int audio_is_muted(void) { return g_mute; }
 
 /* Silencio pedido por el usuario con JOY_SEL (enclavado: cada pulsación lo alterna).
- * Es independiente del mudo de seguridad: con SEP_MUTE = 1 el botón no puede habilitar
- * el sonido. El secuenciador sigue avanzando en silencio, así al volver la música
- * retoma en la nota que corresponde. Se llama desde main, no desde la ISR. */
-static u8 g_user_mute;
+ * Parte apagada (MUSIC_START_MUTED en hw.h). Es independiente del mudo de seguridad:
+ * con SEP_MUTE = 1 el botón no puede habilitar el sonido. El secuenciador sigue avanzando
+ * en silencio, así al volver la música retoma en la nota que corresponde. Se llama desde
+ * main, no desde la ISR. */
+static u8 g_user_mute = MUSIC_START_MUTED;   /* 1 = la música parte apagada */
 
 int audio_user_muted(void) { return g_user_mute; }
 
