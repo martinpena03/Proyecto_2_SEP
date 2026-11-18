@@ -1,5 +1,5 @@
 /*
- * game_fsm.c - Máquina de estados del juego (State_Machine, AC1).
+ * state_machine.c - Máquina de estados del juego (State_Machine, AC1).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (SepHero_BD.pdf página 3, docs/MANUAL_IMPLEMENTACION.md §9.2 y §9.3).
@@ -13,7 +13,14 @@
  * Las flechas del juego no llegan como eventos: se leen de la cola de golpes (hit_pop).
  * El tema claro/oscuro cambia en paralelo a todos los estados (interrupción del OPT3001).
  */
-#include "game_fsm.h"
+#include "state_machine.h"
+
+/* Game_on_off (State_Machine -> Game Manager): 1 = la partida corre (song_ms avanza),
+ * 0 = congelada (PAUSA, GAME OVER). */
+static void game_on_off(int on)
+{
+    clock_song_run(on);
+}
 
 /* -------------------------------------------------------------------------- */
 /* Apoyo                                                                      */
@@ -53,7 +60,7 @@ static void load_selected_song(GameCtx *ctx)
 {
     u16 i, n;
     u32 t0;
-    int r = sd_load_song(&ctx->sd, &ctx->song, ctx->pool, ctx->song_sel);
+    int r = sd_load_song(&ctx->sd, &ctx->song, ctx->pool, ctx->select_song);
 
     ctx->song_ok = (u8)(r > 0);
     if (!ctx->song_ok) {
@@ -108,9 +115,9 @@ static void announce_state(FsmState s)
  * ejecuta la acción de entrada del estado nuevo. */
 static void enter_state(GameCtx *ctx, FsmState ns)
 {
-    if (ctx->st == ST_PLAY && ns != ST_PLAY) input_set_play_mode(0);   /* salir de JUEGO */
-    ctx->prev_st = ctx->st;
-    ctx->st      = ns;
+    if (ctx->state == ST_PLAY && ns != ST_PLAY) input_set_play_mode(0);   /* salir de JUEGO */
+    ctx->prev_state = ctx->state;
+    ctx->state      = ns;
     ctx->t_state = clock_sys_ms();
     ctx->redraw_seq++;
     announce_state(ns);
@@ -137,12 +144,12 @@ static void enter_state(GameCtx *ctx, FsmState ns)
         input_set_play_mode(1);                 /* el joystick pasa a generar golpes */
         break;
     case ST_PAUSE:
-        clock_song_run(0);                      /* congela song_ms */
+        game_on_off(0);                      /* congela song_ms */
         buzzer_pause(&ctx->bz, 1);
         ctx->cursor = 0;
         break;
     case ST_GAMEOVER:
-        clock_song_run(0);
+        game_on_off(0);
         buzzer_stop(&ctx->bz);
         if (ctx->result == RESULT_WIN) buzzer_play_jingle(&ctx->bz, JINGLE_WIN, JINGLE_WIN_N, 0);
         else                           buzzer_play_jingle(&ctx->bz, JINGLE_LOSE, JINGLE_LOSE_N, 0);
@@ -150,7 +157,7 @@ static void enter_state(GameCtx *ctx, FsmState ns)
         ctx->name_pos   = 0;
         ctx->rec_pos    = -1;
         ctx->encore_cnt = 0;
-        ctx->name_entry = (u8)score_qualifies(ctx, ctx->gs.score);
+        ctx->name_entry = (u8)score_qualifies(ctx, ctx->game_status.score);
         break;
     default:
         break;
@@ -160,10 +167,10 @@ static void enter_state(GameCtx *ctx, FsmState ns)
 /* Partida nueva (desde la selección o "Reiniciar"). */
 static void start_game(GameCtx *ctx)
 {
-    game_reset(&ctx->gs);
+    game_reset(&ctx->game_status);
     ctx->count_shown = 0;
     clock_song_set(0);
-    clock_song_run(1);
+    game_on_off(1);
     buzzer_play(&ctx->bz, &ctx->song);
     enter_state(ctx, ST_PLAY);
 }
@@ -172,7 +179,7 @@ static void start_game(GameCtx *ctx)
 static void resume_game(GameCtx *ctx)
 {
     buzzer_pause(&ctx->bz, 0);
-    clock_song_run(1);
+    game_on_off(1);
     enter_state(ctx, ST_PLAY);
 }
 
@@ -185,9 +192,9 @@ void fsm_start(GameCtx *ctx)
 {
     (void)sd_init(&ctx->sd);
     ctx->n_rec    = (u8)sd_load_records(&ctx->sd, ctx->rec, (u8)MAX_RECORDS);
-    ctx->song_sel = 0;
+    ctx->select_song = 0;
     ctx->rec_pos  = -1;
-    ctx->st       = ST_INIT;
+    ctx->state       = ST_INIT;
     enter_state(ctx, ST_INIT);
 }
 
@@ -199,15 +206,15 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
      * El tema habilita el modo claro en el IP propio (LEDs LD0..LD3 con el patrón de la
      * consola); más adelante el mismo bit cambia la paleta del LCD. */
     {
-        u8 th = (u8)theme_current();
-        if (th != ctx->gs.theme || ctx->deb.light != (u8)(th == THEME_LIGHT)) {
+        u8 th = (u8)light_mode_current();
+        if (th != ctx->game_status.light_mode || ctx->deb.light != (u8)(th == THEME_LIGHT)) {
             debouncer_set_theme(&ctx->deb, th == THEME_LIGHT);
         }
-        ctx->gs.theme = th;
+        ctx->game_status.light_mode = th;
     }
-    ctx->gs.crowd = sensors_crowd_level();
+    ctx->game_status.crowd_noise = sensors_crowd_noise();
 
-    switch (ctx->st) {
+    switch (ctx->state) {
     /* ------------------------------------------------------------------ INIT */
     case ST_INIT:
         if (now_sys - ctx->t_state >= 1500u) enter_state(ctx, ST_MENU);
@@ -245,8 +252,8 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
     /* ----------------------------------------------------------------- LEVEL */
     case ST_LEVEL:
         if (ev == UI_UP || ev == UI_DOWN) {
-            if (ev == UI_DOWN) ctx->song_sel = (u8)((ctx->song_sel + 1u) % N_SONGS);
-            else               ctx->song_sel = (u8)((ctx->song_sel + N_SONGS - 1u) % N_SONGS);
+            if (ev == UI_DOWN) ctx->select_song = (u8)((ctx->select_song + 1u) % N_SONGS);
+            else               ctx->select_song = (u8)((ctx->select_song + N_SONGS - 1u) % N_SONGS);
             load_selected_song(ctx);
             ctx->redraw_seq++;
         } else if (ev == UI_OK) {
@@ -258,13 +265,13 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
 
     /* ------------------------------------------------------------------ PLAY */
     case ST_PLAY: {
-        Hit h;
+        Hit_signal h;
         u32 now;
-        int res;
+        int game_over_signal;               /* Game_over_signal: GameResult */
 
-        while (hit_pop(&h)) (void)game_judge_hit(&ctx->gs, &ctx->song, &h);   /* 1.o los golpes */
+        while (hit_pop(&h)) (void)game_judge_hit(&ctx->game_status, &ctx->song, &h);   /* 1.o los golpes */
         now = clock_song_ms();
-        game_update(&ctx->gs, &ctx->song, now);                              /* 2.o el tiempo  */
+        game_update(&ctx->game_status, &ctx->song, now);                              /* 2.o el tiempo  */
 
         /* Cuenta 3-2-1 durante el lead-in: un beep por segundo. */
         if (now < LEADIN_MS) {
@@ -275,16 +282,16 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
             }
         }
 
-        if (ev == UI_SHAKE) {                                               /* acelerómetro */
-            if (game_try_star_power(&ctx->gs)) buzzer_play_sfx(&ctx->bz, SFX_STAR, SFX_STAR_N);
+        if (ev == UI_POWER_UP_ENABLE) {                                               /* acelerómetro */
+            if (game_try_star_power(&ctx->game_status)) buzzer_play_sfx(&ctx->bz, SFX_STAR, SFX_STAR_N);
         } else if (ev == UI_BACK) {
             enter_state(ctx, ST_PAUSE);
             break;
         }
 
-        res = game_is_over(&ctx->gs, &ctx->song, now);
-        if (res != RESULT_NONE) {
-            ctx->result = (u8)res;
+        game_over_signal = game_is_over(&ctx->game_status, &ctx->song, now);
+        if (game_over_signal != RESULT_NONE) {
+            ctx->result = (u8)game_over_signal;
             enter_state(ctx, ST_GAMEOVER);
         }
         break;
@@ -308,13 +315,13 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
     /* -------------------------------------------------------------- GAMEOVER */
     case ST_GAMEOVER:
         /* Bonus encore: un grito sostenido durante los primeros 5 s. */
-        if (!ctx->gs.encore_done && ctx->rec_pos < 0 && (now_sys - ctx->t_state) <= ENCORE_WIN_MS) {
-            if (ctx->gs.crowd >= ENCORE_LEVEL) {
+        if (!ctx->game_status.encore_done && ctx->rec_pos < 0 && (now_sys - ctx->t_state) <= ENCORE_WIN_MS) {
+            if (ctx->game_status.crowd_noise >= ENCORE_LEVEL) {
                 if (++ctx->encore_cnt >= ENCORE_FRAMES) {
-                    ctx->gs.score += ctx->gs.score * ENCORE_BONUS_PCT / 100u;
-                    ctx->gs.encore_done = 1;
+                    ctx->game_status.score += ctx->game_status.score * ENCORE_BONUS_PCT / 100u;
+                    ctx->game_status.encore_done = 1;
                     buzzer_play_sfx(&ctx->bz, SFX_ENCORE, SFX_ENCORE_N);
-                    ctx->name_entry = (u8)score_qualifies(ctx, ctx->gs.score);
+                    ctx->name_entry = (u8)score_qualifies(ctx, ctx->game_status.score);
                     ctx->redraw_seq++;
                 }
             } else {
@@ -328,7 +335,7 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
             else if (ev == UI_DOWN) *c = (char)((*c == 'A') ? 'Z' : *c - 1);
             else if (ev == UI_OK) {
                 if (++ctx->name_pos >= 3u) {
-                    ctx->rec_pos = (s8)records_insert(ctx->rec, &ctx->n_rec, ctx->name, ctx->gs.score);
+                    ctx->rec_pos = (s8)records_insert(ctx->rec, &ctx->n_rec, ctx->name, ctx->game_status.score);
                     (void)sd_save_records(&ctx->sd, ctx->rec, ctx->n_rec);
                     ctx->name_entry = 0;
                     ctx->redraw_seq++;

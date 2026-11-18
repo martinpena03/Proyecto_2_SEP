@@ -6,10 +6,11 @@
  *   de LCD / ADC / I2C sigue el main.c del Proyecto_Base_Booster (LAB10).
  *
  * Modelo de ejecución:
- *   - Las interrupciones (isr.c) llevan el tiempo, muestrean el joystick y los sensores,
- *     secuencian el buzzer y levantan g_frame_flag cada 30 ms.
- *   - El bucle principal atiende el sensor de luz por I2C (theme_task) y, una vez por
- *     frame, avanza la máquina de estados (fsm_step) y dibuja (render_frame).
+ *   - Las interrupciones (isr_handler.c) llevan el tiempo, muestrean el joystick y los sensores,
+ *     secuencian el buzzer y levantan frame_flag cada 30 ms.
+ *   - El bucle principal atiende los sensores de luz y temperatura por I2C (theme_task,
+ *     temp_task) y, una vez por frame, avanza la máquina de estados (fsm_step) y dibuja
+ *     (render_frame).
  *   - El dibujo nunca ocurre dentro de una ISR: el SPI del LCD es lento.
  */
 #include "xparameters.h"
@@ -37,7 +38,7 @@ static void report(const char *what, int code)
 static void init_all(GameCtx *c)
 {
     static const Opt3001Cfg optcfg = { 40, 80 };     /* lux: bajo 40 oscuro, sobre 80 claro */
-    int r;
+    int r, r_iic;
 
     init_platform();
     r = audio_hw_init();                             /* lo primero: buzzer en silencio */
@@ -58,17 +59,22 @@ static void init_all(GameCtx *c)
     r = (init_adc(&SpiInstance1, SPI_DEVICE_ID_1) == XST_SUCCESS) ? 0 : -1;
     report("ADC SPI", r);
     report("joystick (centro)", input_init());
-    report("acelerometro + microfono", sensors_init());
+    report("acelerometro", sensors_acc_init());
+    sensors_mic_init();
 
-    /* I2C + sensor de luz. Si falla, el tema queda fijo en oscuro. axi_gpio_1 va antes
-     * para poder buscar en qué pin llega el INT (AO2). */
-    report("GPIO OPT_INT", gpio1_init(OPT_INT_BIT));
-    r = (init_IIC() == XST_SUCCESS) ? 0 : -1;
-    report("I2C", r);
-    if (r == 0) r = opt3001_init(&optcfg);
+    /* I2C + sensores de luz y temperatura. axi_gpio_1 va antes para poder buscar en qué
+     * pin llegan el INT del OPT3001 y el DRDY del TMP006. Sin sensor de luz, el tema queda
+     * fijo en oscuro; sin el DRDY, no hay interrupción de temperatura (AO2). */
+    report("GPIO SENS_INT", gpio1_init(OPT_INT_BIT));
+    r_iic = (init_IIC() == XST_SUCCESS) ? 0 : -1;
+    report("I2C", r_iic);
+    r = (r_iic == 0) ? opt3001_init(&optcfg) : -1;
     report("OPT3001", r);
     theme_init(r == 0, &optcfg);
     g_opt_bit = (r == 0) ? opt3001_detect_int() : OPT_BIT_NONE;
+    r = (r_iic == 0) ? tmp006_init() : -1;
+    report("TMP006", r);
+    g_tmp_bit = (r == 0) ? tmp006_detect_drdy(g_opt_bit) : SENS_BIT_NONE;
 
     /* IP propio con la configuración por defecto (el juego funciona sin consola). */
     debcfg_default(&c->cfg);
@@ -79,7 +85,7 @@ static void init_all(GameCtx *c)
 }
 
 /* AO2: el acelerómetro no tiene pin de interrupción (salida analógica). La detección
- * corre dentro de la ISR de axi_timer_1 (sensors_sample, cada 10 ms) y aquí solo se
+ * corre dentro de la ISR de axi_timer_1 (sensors_acc_sample, cada 10 ms) y aquí solo se
  * imprime el aviso, porque la UART no se usa dentro de una interrupción. */
 static void motion_task(void)
 {
@@ -97,10 +103,10 @@ int main(void)
     XTime t0, t1, t2;
 
     init_all(&ctx);
-    xil_printf("\r\n--- AVANCE: AO2 (luz + acelerometro por interrupcion), AO3 (debouncer_axi + LEDs modo claro),\r\n"
-               "    AC1 (maquina de estados por consola), AC6 (melodia del menu) ---\r\n"
-               "    INT de luz: %s | umbrales: oscuro < %d lux, claro > %d lux\r\n",
-               opt_cand_name(g_opt_bit), 40, 80);
+    xil_printf("\r\n--- AO2: timers + interrupcion del TMP006 (DRDY en %s, aviso a %d C) | INT de luz: %s\r\n"
+               "    umbrales de luz: oscuro < %d lux, claro > %d lux | musica: %s (JOY_SEL la alterna) ---\r\n",
+               sens_cand_name(g_tmp_bit), TEMP_ALERT_C, opt_cand_name(g_opt_bit), 40, 80,
+               audio_user_muted() ? "OFF" : "ON");
     fsm_start(&ctx);                             /* SD (o respaldo), récords y logo */
 #ifdef SEP_DIAG
     xil_printf("[DIAG] consola de diagnostico activa: 'h' = ayuda\r\n");
@@ -108,14 +114,15 @@ int main(void)
 
     while (1) {
         theme_task();                            /* I2C del OPT3001, si hubo OPT_INT */
+        temp_task();                             /* I2C del TMP006, si hubo DRDY (AO2) */
         motion_task();                           /* aviso del acelerómetro (AO2)     */
         audio_user_mute_task();                  /* JOY_SEL: música ON / OFF         */
 #ifdef SEP_DIAG
         diag_poll(&ctx);
 #endif
-        if (g_frame_flag) {                      /* cada 30 ms (axi_timer_1) */
+        if (frame_flag) {                        /* cada 30 ms (axi_timer_1) */
             UiEvent ev;
-            g_frame_flag = 0;
+            frame_flag = 0;
             ev = ui_pop();
 #ifdef SEP_DIAG
             if (ev == UI_NONE) ev = diag_pop_event();

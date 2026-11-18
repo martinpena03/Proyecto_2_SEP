@@ -1,5 +1,5 @@
 /*
- * text.c - Texto rápido sobre el LCD con las fuentes del curso (Screen Manager, AO1).
+ * screen_manager_text.c - Texto rápido sobre el LCD con las fuentes del curso (Screen Manager, AO1).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: usa las tablas de fuentes del driver LCD del curso (fonts.h, font8..24.c,
@@ -10,7 +10,7 @@
  *
  * Portable: en el PC, lcd_blit escribe en el framebuffer del simulador.
  */
-#include "text.h"
+#include "screen_manager_text.h"
 
 /* Buffer del glifo más grande (Font24: 17 x 24). */
 static u16 glyph[MAX_WIDTH_FONT * MAX_HEIGHT_FONT];

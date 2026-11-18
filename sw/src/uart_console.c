@@ -1,5 +1,5 @@
 /*
- * diag.c - Consola de diagnóstico por UART (solo si se compila con -DSEP_DIAG).
+ * uart_console.c - Consola de diagnóstico por UART (solo si se compila con -DSEP_DIAG).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio.
  *
@@ -17,7 +17,7 @@
 #include "xparameters.h"
 #include "sleep.h"
 #include "hw.h"
-#include "text.h"
+#include "screen_manager_text.h"
 #include "lib/ADC.h"
 #include "lib/I2C.h"
 #include "lib/LCD_GUI.h"
@@ -64,10 +64,11 @@ static void dump_adc(void)
     xil_printf("[ADC] curso : joyX=%d joyY=%d acX=%d acY=%d acZ=%d mic=%d\r\n",
                read_joyx(), read_joyy(), read_acx(), read_acy(), read_acz(), read_MIC());
     input_get_joy(&x, &y, &x0, &y0);
-    sensors_get_debug(acc, &cpg, &p2p, &noise, &shakes);
+    sensors_acc_debug(acc, &cpg, &shakes);
+    sensors_mic_debug(&p2p, &noise);
     xil_printf("[JOY] x=%d y=%d centro=(%d,%d)\r\n", x, y, x0, y0);
     xil_printf("[SENS] cpg=%d mic_p2p=%d mic_ruido=%d publico=%d sacudidas=%d\r\n",
-               cpg, p2p, noise, sensors_crowd_level(), (int)shakes);
+               cpg, p2p, noise, sensors_crowd_noise(), (int)shakes);
 }
 
 static void dump_opt(void)
@@ -76,13 +77,13 @@ static void dump_opt(void)
                opt_read_reg(0x00), opt_read_reg(0x01), opt_read_reg(0x02), opt_read_reg(0x03),
                opt_read_reg(0x7E), opt_read_reg(0x7F));
     xil_printf("[OPT] lux=%d tema=%s gpio1=0x%03x bit=%d cambios=%d\r\n", opt3001_read_lux(),
-               (theme_current() == THEME_LIGHT) ? "CLARO" : "OSCURO",
+               (light_mode_current() == THEME_LIGHT) ? "CLARO" : "OSCURO",
                (int)gpio1_read(), g_opt_bit, (int)g_theme_changes);
 }
 
 static void dump_deb(GameCtx *ctx)
 {
-    u32 b = XPAR_DEBOUNCER_AXI_0_BASEADDR;
+    u32 b = XPAR_DEBOUNCER_IP_BASEADDR;
     xil_printf("[DEB] CTRL=0x%x DEB_MS=%d BTN_MASK=0x%x STATE=0x%x EDGE=0x%x (cfg %d ms, mask 0x%x)\r\n",
                (int)Xil_In32(b + 0x00), (int)Xil_In32(b + 0x04), (int)Xil_In32(b + 0x08),
                (int)Xil_In32(b + 0x0C), (int)Xil_In32(b + 0x10), ctx->cfg.deb_ms, ctx->cfg.btn_mask);
@@ -104,9 +105,9 @@ static void dump_ttc(GameCtx *ctx)
 static void dump_status(GameCtx *ctx)
 {
     xil_printf("[ST] %s cursor=%d cancion=%d sd=%d | song_ms=%d score=%d hits=%d miss=%d racha=%d rock=%d star=%d/%d | auto=%d\r\n",
-               st_name(ctx->st), ctx->cursor, ctx->song_sel, ctx->sd.mounted, (int)clock_song_ms(),
-               (int)ctx->gs.score, ctx->gs.hits, ctx->gs.misses, ctx->gs.streak, ctx->gs.rock,
-               ctx->gs.star_phase, ctx->gs.star_bar, g_auto);
+               st_name(ctx->state), ctx->cursor, ctx->select_song, ctx->sd.mounted, (int)clock_song_ms(),
+               (int)ctx->game_status.score, ctx->game_status.hits, ctx->game_status.misses, ctx->game_status.streak, ctx->game_status.rock,
+               ctx->game_status.star_phase, ctx->game_status.star_bar, g_auto);
 }
 
 static void dump_timers(void)
@@ -141,18 +142,12 @@ static void lcd_pattern(GameCtx *ctx)
     ctx->redraw_seq++;                       /* el siguiente cambio de estado repinta */
 }
 
-/* Nombres de los pines candidatos, en el orden de los bits de axi_gpio_1 del build
- * "finder" (hw/scripts/02_build_bd.tcl). */
-static const char *const CAND[25] = {
-    "U14(JD7)", "U15(JD8)", "V15(JC1)", "W15(JC2)", "T11(JC3)", "T10(JC4)", "U17(JE8)", "T17(JE9)", "Y17(JE10)",
-    "N15(JA1)", "L14(JA2)", "K16(JA3)", "K14(JA4)", "N16(JA7)", "L15(JA8)", "J16(JA9)", "J14(JA10)",
-    "V8(JB1)", "W8(JB2)", "U7(JB3)", "V7(JB4)", "Y7(JB7)", "Y6(JB8)", "V6(JB9)", "W6(JB10)" };
-
+/* Imprime los pines candidatos de axi_gpio_1 (SENS_INT, Pmod JA) marcados en m. */
 static void print_bits(const char *tag, u32 m)
 {
-    int i;
-    xil_printf("[FIND] %s = 0x%07x:", tag, (int)m);
-    for (i = 0; i < 25; i++) if (m & (1u << i)) xil_printf(" %s", CAND[i]);
+    u8 i;
+    xil_printf("[FIND] %s = 0x%02x:", tag, (int)m);
+    for (i = 0; i < SENS_CAND_N; i++) if (m & (1u << i)) xil_printf(" %s", sens_cand_name(i));
     xil_printf("\r\n");
 }
 
@@ -209,7 +204,7 @@ static void tmp_finder(void)
  * luz actual quede fuera. theme_task() cambia el tema y rearma la ventana normal. */
 static void opt_force(void)
 {
-    if (theme_current() == THEME_LIGHT) (void)opt_write_reg(0x02, 0xBFFFu);   /* LOW al máximo  */
+    if (light_mode_current() == THEME_LIGHT) (void)opt_write_reg(0x02, 0xBFFFu);   /* LOW al máximo  */
     else                                (void)opt_write_reg(0x03, 0x0000u);   /* HIGH al mínimo */
     xil_printf("[OPT] ventana forzada; esperando la interrupcion (gpio irq=%d)\r\n", (int)g_irq_cnt[3]);
 }
@@ -235,7 +230,7 @@ void diag_poll(GameCtx *ctx)
 {
     int c;
     u8 xo, yo;
-    if (ctx->st == ST_CONFIG) return;             /* la consola la usa uart_config */
+    if (ctx->state == ST_CONFIG) return;             /* la consola la usa uart_config */
     c = uart_hal_getc();
     if (c < 0) return;
     lcd_get_offsets(&xo, &yo);
@@ -251,7 +246,7 @@ void diag_poll(GameCtx *ctx)
     case '2': g_inj = UI_BACK; break;
     case 'u': g_inj = UI_UP; break;
     case 'j': g_inj = UI_DOWN; break;
-    case 'k': g_inj = UI_SHAKE; break;
+    case 'k': g_inj = UI_POWER_UP_ENABLE; break;
     case 'p': g_auto = (u8)!g_auto; g_auto_miss = 0; xil_printf("[AUTO] %d\r\n", g_auto); break;
     case 'P': g_auto = 1; g_auto_miss = 3; xil_printf("[AUTO] fallando 1 de 3\r\n"); break;
     case 'l': lcd_pattern(ctx); break;
@@ -278,20 +273,20 @@ void diag_frame(GameCtx *ctx, u32 fsm_us, u32 render_us)
     g_rnd_sum += render_us;
     g_frames++;
 
-    if (ctx->st != g_last_st) {
-        xil_printf("[FSM] %s -> %s (t=%d ms)\r\n", st_name(g_last_st), st_name(ctx->st), (int)clock_sys_ms());
-        if (ctx->st == ST_PLAY && clock_song_ms() < 200u) g_auto_next = 0;
-        if (ctx->st == ST_GAMEOVER) {
+    if (ctx->state != g_last_st) {
+        xil_printf("[FSM] %s -> %s (t=%d ms)\r\n", st_name(g_last_st), st_name(ctx->state), (int)clock_sys_ms());
+        if (ctx->state == ST_PLAY && clock_song_ms() < 200u) g_auto_next = 0;
+        if (ctx->state == ST_GAMEOVER) {
             xil_printf("[GAME] fin: %s score=%d hits=%d miss=%d racha_max=%d rock=%d\r\n",
-                       (ctx->result == RESULT_WIN) ? "VICTORIA" : "DERROTA", (int)ctx->gs.score,
-                       ctx->gs.hits, ctx->gs.misses, ctx->gs.max_streak, ctx->gs.rock);
+                       (ctx->result == RESULT_WIN) ? "VICTORIA" : "DERROTA", (int)ctx->game_status.score,
+                       ctx->game_status.hits, ctx->game_status.misses, ctx->game_status.max_streak, ctx->game_status.rock);
         }
-        g_last_st = ctx->st;
+        g_last_st = ctx->state;
     }
 
     /* Autoplay: encola el golpe de cada nota en su instante exacto (como si el jugador
      * no fallara), para recorrer una partida completa sin manos. */
-    if (g_auto && ctx->st == ST_PLAY) {
+    if (g_auto && ctx->state == ST_PLAY) {
         u32 now = clock_song_ms();
         while (g_auto_next < ctx->song.n && ctx->song.chart[g_auto_next].t_ms <= now + 20u) {
             if (g_auto_miss == 0u || (g_auto_next % g_auto_miss) != 0u) {

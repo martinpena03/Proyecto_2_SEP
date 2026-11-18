@@ -92,32 +92,32 @@ typedef struct {
     u8  charge;                /* aciertos seguidos desde el último reinicio        */
     volatile u32 star_ms;      /* ms restantes de star power (lo descuenta timer0)  */
     s8  rock;                  /* rock meter; 0 => GAME OVER                        */
-    u8  theme;                 /* Theme                                             */
-    u8  crowd;                 /* nivel del público 0..100 (micrófono)              */
+    u8  light_mode;            /* Light_mode: Theme (Light_aconditioner)            */
+    u8  crowd_noise;           /* Crowd_noise: nivel del público 0..100 (micrófono) */
     u16 next_note;             /* primera nota sin juzgar                           */
     u16 hits, misses;
     u8  judged[(MAX_NOTES + 7u) / 8u];   /* bitset: nota i ya juzgada               */
     u8  rcv_fx[N_LANES];       /* frames de destello que le quedan al receptor      */
     u8  rcv_fx_kind[N_LANES];  /* 1 = acierto, 2 = fallo                            */
     u8  encore_done;
-} GameState;
+} Game_status;
 
 typedef enum { RESULT_NONE = 0, RESULT_WIN = 1, RESULT_LOSE = 2 } GameResult;
 
 /* Golpe: flecha del joystick con su sello de tiempo (lo encola timer1_isr). */
 typedef struct {
     u8  lane;      /* Lane */
-    u32 song_ms;
-} Hit;
+    u32 t_ms;      /* instante del golpe en ms de canción      */
+} Hit_signal;
 
 typedef struct {
     char name[4];   /* 3 letras + '\0' */
     u32  score;
 } Record;
 
-/* Eventos de interfaz. Las flechas del juego NO pasan por aquí (van a la cola de Hit). */
+/* Eventos de interfaz. Las flechas del juego NO pasan por aquí (van a la cola de Hit_signal). */
 typedef enum {
-    UI_NONE = 0, UI_OK, UI_BACK, UI_UP, UI_DOWN, UI_SHAKE
+    UI_NONE = 0, UI_OK, UI_BACK, UI_UP, UI_DOWN, UI_POWER_UP_ENABLE
 } UiEvent;
 
 /* Macros de apoyo para el bitset judged[] (AC2). */

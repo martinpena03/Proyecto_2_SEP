@@ -1,5 +1,5 @@
 /*
- * lcd_fast.c - Rellenos y bloques de píxeles por ráfagas SPI (Screen Manager, AO1).
+ * screen_manager_lcd.c - Rellenos y bloques de píxeles por ráfagas SPI (Screen Manager, AO1).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: usa la inicialización, el SPI y el GPIO del driver LCD del curso

@@ -1,10 +1,10 @@
 /*
- * text.h - Texto rápido sobre el LCD con las fuentes del curso.
+ * screen_manager_text.h - Texto rápido sobre el LCD con las fuentes del curso.
  *
- * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Ver text.c.
+ * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Ver screen_manager_text.c.
  */
-#ifndef TEXT_H
-#define TEXT_H
+#ifndef SCREEN_MANAGER_TEXT_H
+#define SCREEN_MANAGER_TEXT_H
 
 #include "interfaces.h"
 #include "lib/fonts.h"      /* sFONT, Font8..Font24 (driver LCD del curso) */
@@ -18,4 +18,4 @@ void text_center(u16 y, const char *s, const sFONT *f, u16 fg, u16 bg);
 /* Escribe v en decimal con 'digits' cifras y ceros a la izquierda. Devuelve el fin. */
 char *fmt_pad(char *dst, u32 v, u8 digits);
 
-#endif /* TEXT_H */
+#endif /* SCREEN_MANAGER_TEXT_H */

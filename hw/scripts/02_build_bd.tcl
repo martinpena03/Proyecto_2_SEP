@@ -12,11 +12,9 @@
 #   vivado -mode batch -source hw/scripts/02_build_bd.tcl -tclargs finder
 #
 # Modos:
-#   final  : axi_gpio_1 de 1 bit en el pin OPT_INT definido en hw/constraints/sephero.xdc.
-#            Exporta hw/export/sephero.xsa, hw/export/design_1_wrapper.ltx y hw/bd/design_1.tcl.
-#   finder : build provisional para identificar el pin INT del OPT3001: axi_gpio_1 de
-#            9 bits sobre los pines Pmod libres (manual §15.1). Exporta a hw/vivado/
-#            (no se versiona).
+#   final  : exporta hw/export/sephero.xsa, hw/export/design_1_wrapper.ltx y hw/bd/design_1.tcl.
+#   finder : el mismo diseño, exportado a hw/vivado/ (no se versiona).
+#   Ambos dejan axi_gpio_1 con los 8 pines candidatos del Pmod JA (puerto SENS_INT).
 #
 # El proyecto queda en hw/vivado/sephero (ignorado por git).
 # =============================================================================
@@ -31,13 +29,16 @@ set JOBS  2   ;# nunca mas de 2: con mas nucleos el PC se cae
 # Vivado 2020.1 se cae (TclStackFree: incorrect freePtr) con muchas sintesis OOC multihilo.
 set_param general.maxThreads 1
 
-# Pines candidatos del INT del OPT3001: los libres de los Pmod JD, JC y JE (bits 0..8)
-# y todos los de JA (bits 9..16). JB no existe en la Zybo Z7-10 (banco 13 sin bonding:
-# el build de 25 pines falló en place_design). Ambos modos usan los 17 candidatos: el
-# firmware detecta en el arranque qué bit sigue al INT (cambiando POL del OPT3001) y, si
-# ninguno, pasa a un respaldo por timer. Así no hace falta otro bitstream al encontrarlo.
-set OPT_CAND {U14 U15 V15 W15 T11 T10 U17 T17 Y17 N15 L14 K16 K14 N16 L15 J16 J14}
-set OPT_W [llength $OPT_CAND]
+# Pines candidatos de las interrupciones de sensores (puerto SENS_INT): DRDY del TMP006
+# (temperatura, AO2) e INT del OPT3001. Son los 8 del Pmod JA, que la tarjeta de extensión
+# no ocupa: ninguno de los dos pines llega a la Zybo por la tarjeta, así que se traen con un
+# cable desde la BoosterPack (DRDY J2.11 -> JA1; INT del OPT3001 J1.8 -> otro pin de JA).
+# No se usan pines libres de JC, JD ni JE: los ocupa la tarjeta y se probó que ni el DRDY
+# ni el INT llegan a ellos. JB no existe en la Zybo Z7-10. El firmware detecta en el arranque qué
+# bit sigue a cada pin (DRDY: baja al convertir y sube al leer; INT: sigue a POL del
+# OPT3001). Si el INT de luz no aparece, la luz pasa a un respaldo por timer.
+set SENS_CAND {N15 L14 K16 K14 N16 L15 J16 J14}
+set SENS_W [llength $SENS_CAND]
 
 # ----------------------------------------------------------------------------
 # Proyecto
@@ -113,14 +114,14 @@ set_property -dict [list \
 set iic [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_iic:2.0 axi_iic_0]
 set_property CONFIG.IIC_FREQ_KHZ {100} $iic
 
-# M04: GPIO de entrada con interrupción para el INT del OPT3001.
+# M04: GPIO de entrada con interrupción: DRDY del TMP006 (AO2) e INT del OPT3001.
 set gpio1 [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 axi_gpio_1]
 set_property -dict [list \
-    CONFIG.C_GPIO_WIDTH $OPT_W CONFIG.C_ALL_INPUTS {1} CONFIG.C_INTERRUPT_PRESENT {1} \
+    CONFIG.C_GPIO_WIDTH $SENS_W CONFIG.C_ALL_INPUTS {1} CONFIG.C_INTERRUPT_PRESENT {1} \
 ] $gpio1
 
 # M05: IP propio (AO3).
-set deb [create_bd_cell -type ip -vlnv uc.cl:sephero:debouncer_axi:1.0 debouncer_axi_0]
+set deb [create_bd_cell -type ip -vlnv uc.cl:sephero:debouncer_axi:1.0 Debouncer_IP]
 set_property -dict [list CONFIG.G_WIDTH {3} CONFIG.G_TICKS_PER_MS {50000}] $deb
 
 # M06 / M07: timers (solo el timer 0 de cada IP, 32 bits).
@@ -159,7 +160,7 @@ set slaves {
     axi_quad_spi_1/AXI_LITE
     axi_iic_0/S_AXI
     axi_gpio_1/S_AXI
-    debouncer_axi_0/s00_axi
+    Debouncer_IP/s00_axi
     axi_timer_1/S_AXI
     axi_timer_0/S_AXI
 }
@@ -179,13 +180,13 @@ set clk_pins [list \
     axi_quad_spi_1/s_axi_aclk axi_quad_spi_1/ext_spi_clk \
     axi_gpio_0/s_axi_aclk axi_gpio_1/s_axi_aclk axi_iic_0/s_axi_aclk \
     axi_timer_0/s_axi_aclk axi_timer_1/s_axi_aclk \
-    debouncer_axi_0/s00_axi_aclk vio_0/clk ila_0/clk]
+    Debouncer_IP/s00_axi_aclk vio_0/clk ila_0/clk]
 set rst_pins [list \
     ps7_0_axi_periph/S00_ARESETN \
     axi_quad_spi_0/s_axi_aresetn axi_quad_spi_1/s_axi_aresetn \
     axi_gpio_0/s_axi_aresetn axi_gpio_1/s_axi_aresetn axi_iic_0/s_axi_aresetn \
     axi_timer_0/s_axi_aresetn axi_timer_1/s_axi_aresetn \
-    debouncer_axi_0/s00_axi_aresetn]
+    Debouncer_IP/s00_axi_aresetn]
 for {set i 0} {$i < 8} {incr i} {
     lappend clk_pins ps7_0_axi_periph/M0${i}_ACLK
     lappend rst_pins ps7_0_axi_periph/M0${i}_ARESETN
@@ -202,11 +203,11 @@ connect_bd_net [get_bd_pins rst_ps7_0_50M/interconnect_aresetn] [get_bd_pins ps7
 # ----------------------------------------------------------------------------
 # Interrupciones: xlconcat_0 -> IRQ_F2P[3:0] (ID del GIC 61..64)
 # ----------------------------------------------------------------------------
-connect_bd_net [get_bd_pins axi_timer_0/interrupt]      [get_bd_pins xlconcat_0/In0]   ;# 61: 1 ms
-connect_bd_net [get_bd_pins axi_timer_1/interrupt]      [get_bd_pins xlconcat_0/In1]   ;# 62: 2 ms
-connect_bd_net [get_bd_pins debouncer_axi_0/irq]        [get_bd_pins xlconcat_0/In2] [get_bd_pins ila_0/probe3] ;# 63
-connect_bd_net [get_bd_pins axi_gpio_1/ip2intc_irpt]    [get_bd_pins xlconcat_0/In3]   ;# 64: OPT_INT
-connect_bd_net [get_bd_pins xlconcat_0/dout]            [get_bd_pins processing_system7_0/IRQ_F2P]
+connect_bd_net -net irq_t0 [get_bd_pins axi_timer_0/interrupt]      [get_bd_pins xlconcat_0/In0]   ;# 61: 1 ms
+connect_bd_net -net irq_t1 [get_bd_pins axi_timer_1/interrupt]      [get_bd_pins xlconcat_0/In1]   ;# 62: 2 ms
+connect_bd_net -net irq_deb [get_bd_pins Debouncer_IP/irq]        [get_bd_pins xlconcat_0/In2] [get_bd_pins ila_0/probe3] ;# 63
+connect_bd_net -net irq_gpio [get_bd_pins axi_gpio_1/ip2intc_irpt]    [get_bd_pins xlconcat_0/In3]   ;# 64: SENS_INT (TMP_DRDY / OPT_INT)
+connect_bd_net -net IRQ_F2P [get_bd_pins xlconcat_0/dout]            [get_bd_pins processing_system7_0/IRQ_F2P]
 
 # ----------------------------------------------------------------------------
 # Puertos externos
@@ -232,25 +233,25 @@ connect_bd_intf_net [get_bd_intf_ports iic_rtl] [get_bd_intf_pins axi_iic_0/IIC]
 
 # Buzzer: PWM del TTC0 del PS, ruteado por EMIO.
 create_bd_port -dir O BUZZER_PWM
-connect_bd_net [get_bd_ports BUZZER_PWM] [get_bd_pins processing_system7_0/TTC0_WAVE0_OUT]
+connect_bd_net -net TTC0_WAVE0_OUT [get_bd_ports BUZZER_PWM] [get_bd_pins processing_system7_0/TTC0_WAVE0_OUT]
 
 # Botones de la Booster -> IP propio (y sonda del ILA sobre la misma red).
-create_bd_port -dir I -from 2 -to 0 btn_in
-connect_bd_net [get_bd_ports btn_in] [get_bd_pins debouncer_axi_0/btn_in] [get_bd_pins ila_0/probe0]
+create_bd_port -dir I -from 2 -to 0 btn_raw
+connect_bd_net -net btn_raw [get_bd_ports btn_raw] [get_bd_pins Debouncer_IP/btn_in] [get_bd_pins ila_0/probe0]
 
 # LEDs LD0..LD3 de la Zybo <- IP propio (indicador del modo claro).
 create_bd_port -dir O -from 3 -to 0 leds
-connect_bd_net [get_bd_ports leds] [get_bd_pins debouncer_axi_0/leds]
+connect_bd_net [get_bd_ports leds] [get_bd_pins Debouncer_IP/leds]
 
-# INT del OPT3001 -> axi_gpio_1.
-create_bd_port -dir I -from [expr {$OPT_W - 1}] -to 0 opt_int
-connect_bd_net [get_bd_ports opt_int] [get_bd_pins axi_gpio_1/gpio_io_i]
+# DRDY del TMP006 e INT del OPT3001 -> axi_gpio_1 (puerto SENS_INT, 8 candidatos en JA).
+create_bd_port -dir I -from [expr {$SENS_W - 1}] -to 0 SENS_INT
+connect_bd_net -net SENS_INT [get_bd_ports SENS_INT] [get_bd_pins axi_gpio_1/gpio_io_i]
 
 # Depuración del IP propio.
-connect_bd_net [get_bd_pins debouncer_axi_0/dbg_state] [get_bd_pins vio_0/probe_in0] [get_bd_pins ila_0/probe1]
-connect_bd_net [get_bd_pins debouncer_axi_0/dbg_edge]  [get_bd_pins vio_0/probe_in1] [get_bd_pins ila_0/probe2]
-connect_bd_net [get_bd_pins debouncer_axi_0/dbg_tick]  [get_bd_pins ila_0/probe4]
-connect_bd_net [get_bd_pins vio_0/probe_out0]          [get_bd_pins debouncer_axi_0/btn_virt]
+connect_bd_net [get_bd_pins Debouncer_IP/dbg_state] [get_bd_pins vio_0/probe_in0] [get_bd_pins ila_0/probe1]
+connect_bd_net [get_bd_pins Debouncer_IP/dbg_edge]  [get_bd_pins vio_0/probe_in1] [get_bd_pins ila_0/probe2]
+connect_bd_net [get_bd_pins Debouncer_IP/dbg_tick]  [get_bd_pins ila_0/probe4]
+connect_bd_net [get_bd_pins vio_0/probe_out0]          [get_bd_pins Debouncer_IP/btn_virt]
 
 # ----------------------------------------------------------------------------
 # Mapa de direcciones (SepHero_BD página 2)
@@ -267,7 +268,7 @@ sephero_addr axi_quad_spi_0/AXI_LITE/Reg   0x41E00000
 sephero_addr axi_quad_spi_1/AXI_LITE/Reg   0x41E10000
 sephero_addr axi_timer_0/S_AXI/Reg         0x42800000
 sephero_addr axi_timer_1/S_AXI/Reg         0x42810000
-sephero_addr debouncer_axi_0/s00_axi/*     0x43C00000
+sephero_addr Debouncer_IP/s00_axi/*     0x43C00000
 
 regenerate_bd_layout
 validate_bd_design
@@ -285,8 +286,8 @@ set_property top ${BD}_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
 add_files -fileset constrs_1 -norecurse $ROOT/hw/constraints/sephero.xdc
-# Candidatos del INT del OPT3001 (archivo fijo: generarlo en el build dejó un .xdc vacío).
-add_files -fileset constrs_1 -norecurse $ROOT/hw/constraints/opt_int_candidates.xdc
+# Candidatos de SENS_INT (archivo fijo: generarlo en el build dejó un .xdc vacío).
+add_files -fileset constrs_1 -norecurse $ROOT/hw/constraints/sens_int_candidates.xdc
 
 launch_runs impl_1 -to_step write_bitstream -jobs $JOBS
 wait_on_run impl_1

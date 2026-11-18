@@ -1,5 +1,5 @@
 /*
- * sd_storage.c - microSD con FatFs (xilffs) y respaldo embebido (SD_Manager, AC7).
+ * sd_manager.c - microSD con FatFs (xilffs) y respaldo embebido (SD_Manager, AC7).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: uso de xilffs visto en la clase del 02-11-2026 ("memoria microSD y FAT en
@@ -9,7 +9,7 @@
  * Comportamiento:
  *   - Con tarjeta FAT32: lee 0:/SONGn.SHC (si falta, usa el chart embebido) y lee /
  *     escribe 0:/RECORDS.TXT cada vez que alguien entra al top 5.
- *   - Sin tarjeta: charts embebidos (song_embedded.c) y récords solo en RAM.
+ *   - Sin tarjeta: charts embebidos (sd_manager_songs.c) y récords solo en RAM.
  * Con -DSEP_NO_SD no se intenta montar (por si el montaje sin tarjeta se colgara).
  */
 #include "xparameters.h"

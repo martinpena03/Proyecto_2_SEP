@@ -1,10 +1,10 @@
 /*
- * render.c - Pantallas del juego en el LCD 128x128 (Screen Manager, AO1).
+ * screen_manager.c - Pantallas del juego en el LCD 128x128 (Screen Manager, AO1).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (SepHero_BD.pdf página 4 = mockup, docs/MANUAL_IMPLEMENTACION.md §9.5).
  *
- * Portable: dibuja solo con lcd_fill, lcd_blit (lcd_fast.c) y text_draw (text.c). En el
+ * Portable: dibuja solo con lcd_fill, lcd_blit (screen_manager_lcd.c) y text_draw (screen_manager_text.c). En el
  * PC esas funciones escriben en un framebuffer (sim/), así las pantallas se revisan sin
  * la placa.
  *
@@ -16,9 +16,9 @@
  *   - Cada tramo de carril se compone en un buffer (fondo + receptor + notas) y se
  *     envía con un solo lcd_blit: no hay parpadeo ni restos de la nota anterior.
  */
-#include "game_fsm.h"
-#include "arrows.h"
-#include "text.h"
+#include "state_machine.h"
+#include "screen_manager_arrows.h"
+#include "screen_manager_text.h"
 
 /* ------------------------------------------------------------------------ */
 /* Geometría de la pantalla de juego (píxeles)                              */
@@ -82,7 +82,7 @@ static const u16 LANE_COLOR[N_LANES] = { C_MAGENTA, C_GREEN, C_YELLOW, C_RED };
 typedef struct { u16 idx; s16 y; u8 lane; } Vis;    /* nota visible y su posición */
 
 static struct {
-    u8  valid, seq, st, theme;
+    u8  valid, seq, state, light_mode;
     /* juego */
     u32 score;
     u8  star_on, crowd_lvl, count, fx[N_LANES];
@@ -165,7 +165,7 @@ static void vbar(u16 x0, u16 x1, s16 *ch, u16 *ccol, s16 h, u16 col, u16 bg, int
 /* ------------------------------------------------------------------------ */
 
 /* Compone y envía el tramo [y0, y1) del carril 'lane': fondo, receptor y notas. */
-static void draw_lane_span(const Palette *p, const GameState *gs, int star, u8 lane,
+static void draw_lane_span(const Palette *p, const Game_status *gs, int star, u8 lane,
                            s16 y0, s16 y1, const Vis *vis, u8 nvis)
 {
     s16 h, sy;
@@ -237,9 +237,9 @@ static void play_static(const Palette *p, int star)
 
 static void render_play(const GameCtx *ctx, int full)
 {
-    const GameState *gs = &ctx->gs;
+    const Game_status *gs = &ctx->game_status;
     const Song *song = &ctx->song;
-    const Palette *p = &PAL[gs->theme & 1u];
+    const Palette *p = &PAL[gs->light_mode & 1u];
     u32 now = clock_song_ms();
     int star = (gs->star_phase == STAR_ACTIVE);
     int star_changed = (rc.star_on != (u8)star);
@@ -282,7 +282,7 @@ static void render_play(const GameCtx *ctx, int full)
 
     /* --- 2: público (micrófono): 3 barras crecientes -------------------- */
     {
-        u8 lvl = (gs->crowd >= 80u) ? 3u : (gs->crowd >= 50u) ? 2u : (gs->crowd >= 20u) ? 1u : 0u;
+        u8 lvl = (gs->crowd_noise >= 80u) ? 3u : (gs->crowd_noise >= 50u) ? 2u : (gs->crowd_noise >= 20u) ? 1u : 0u;
         if (full || lvl != rc.crowd_lvl) {
             for (k = 0; k < 3u; k++) {
                 u16 x = (u16)(108u + 6u * k);
@@ -296,7 +296,7 @@ static void render_play(const GameCtx *ctx, int full)
     /* --- 3: barra de poder ---------------------------------------------- */
     {
         s16 h = (s16)((u32)gs->star_bar * BAR_H / 100u);
-        u16 col = (gs->theme == THEME_DARK) ? C_YELLOW : C_ORANGE;
+        u16 col = (gs->light_mode == THEME_DARK) ? C_YELLOW : C_ORANGE;
         if (gs->star_phase == STAR_ACTIVE) col = C_STAR;
         else if (gs->star_phase == STAR_READY && ((frame_no >> 3) & 1u)) col = p->fg;  /* parpadea */
         vbar(3, 10, &rc.pow_h, &rc.pow_col, h, col, p->bg, full);
@@ -382,7 +382,7 @@ static void render_play(const GameCtx *ctx, int full)
 
 static void render_init(const GameCtx *ctx, int full)
 {
-    const Palette *p = &PAL[ctx->gs.theme & 1u];
+    const Palette *p = &PAL[ctx->game_status.light_mode & 1u];
     u8 l;
     if (!full) return;
     lcd_fill(0, 0, LCD_W, LCD_H, p->bg);
@@ -399,7 +399,7 @@ static const char *const MENU_TXT[MENU_ITEMS] = { "Jugar", "Records", "Configura
 
 static void render_menu(const GameCtx *ctx, int full)
 {
-    const Palette *p = &PAL[ctx->gs.theme & 1u];
+    const Palette *p = &PAL[ctx->game_status.light_mode & 1u];
     u8 i;
     if (full) {
         lcd_fill(0, 0, LCD_W, LCD_H, p->bg);
@@ -419,7 +419,7 @@ static void render_menu(const GameCtx *ctx, int full)
 
 static void render_records(const GameCtx *ctx, int full)
 {
-    const Palette *p = &PAL[ctx->gs.theme & 1u];
+    const Palette *p = &PAL[ctx->game_status.light_mode & 1u];
     char b[20];
     u8 i;
     if (!full) return;
@@ -444,7 +444,7 @@ static void render_records(const GameCtx *ctx, int full)
 
 static void render_config(const GameCtx *ctx, int full)
 {
-    const Palette *p = &PAL[ctx->gs.theme & 1u];
+    const Palette *p = &PAL[ctx->game_status.light_mode & 1u];
     char b[20];
     char *q;
     if (!full) return;
@@ -465,7 +465,7 @@ static void render_config(const GameCtx *ctx, int full)
 
 static void render_level(const GameCtx *ctx, int full)
 {
-    const Palette *p = &PAL[ctx->gs.theme & 1u];
+    const Palette *p = &PAL[ctx->game_status.light_mode & 1u];
     char b[24];
     char *q;
     if (!full) return;
@@ -473,7 +473,7 @@ static void render_level(const GameCtx *ctx, int full)
     title(p, "CANCION", p->fg);
     q = b;
     *q++ = '<'; *q++ = ' ';
-    q = fmt_u32(q, (u32)ctx->song_sel + 1u);
+    q = fmt_u32(q, (u32)ctx->select_song + 1u);
     *q++ = '/';
     q = fmt_u32(q, N_SONGS);
     *q++ = ' '; *q++ = '>'; *q = '\0';
@@ -497,7 +497,7 @@ static const char *const PAUSE_TXT[PAUSE_ITEMS] = { "Continuar", "Reiniciar", "S
 
 static void render_pause(const GameCtx *ctx, int full)
 {
-    const Palette *p = &PAL[ctx->gs.theme & 1u];
+    const Palette *p = &PAL[ctx->game_status.light_mode & 1u];
     u8 i;
     if (full) {
         render_play(ctx, 1);                        /* la pista congelada queda de fondo */
@@ -515,8 +515,8 @@ static void render_pause(const GameCtx *ctx, int full)
 
 static void render_gameover(const GameCtx *ctx, int full)
 {
-    const Palette *p = &PAL[ctx->gs.theme & 1u];
-    const GameState *gs = &ctx->gs;
+    const Palette *p = &PAL[ctx->game_status.light_mode & 1u];
+    const Game_status *gs = &ctx->game_status;
     char b[24];
     char *q;
     u32 total = (u32)gs->hits + gs->misses;
@@ -579,11 +579,11 @@ static void render_gameover(const GameCtx *ctx, int full)
 /* ------------------------------------------------------------------------ */
 void render_frame(const GameCtx *ctx)
 {
-    u8 theme = (u8)(ctx->gs.theme & 1u);
-    int full = !rc.valid || rc.seq != ctx->redraw_seq || rc.st != (u8)ctx->st || rc.theme != theme;
+    u8 theme = (u8)(ctx->game_status.light_mode & 1u);
+    int full = !rc.valid || rc.seq != ctx->redraw_seq || rc.state != (u8)ctx->state || rc.light_mode != theme;
 
     frame_no++;
-    switch (ctx->st) {
+    switch (ctx->state) {
     case ST_INIT:     render_init(ctx, full);     break;
     case ST_MENU:     render_menu(ctx, full);     break;
     case ST_RECORDS:  render_records(ctx, full);  break;
@@ -596,6 +596,6 @@ void render_frame(const GameCtx *ctx)
     }
     rc.valid = 1;
     rc.seq   = ctx->redraw_seq;
-    rc.st    = (u8)ctx->st;
-    rc.theme = theme;
+    rc.state      = (u8)ctx->state;
+    rc.light_mode = theme;
 }

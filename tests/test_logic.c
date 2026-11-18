@@ -1,5 +1,5 @@
 /*
- * test_logic.c - Tests de game_engine, joy_logic, sd_formats, audio_seq, debcfg y
+ * test_logic.c - Tests de game_manager, joystick_aconditioner_logic, sd_manager_formats, sound_manager, debcfg y
  * uart_config (docs/MANUAL_IMPLEMENTACION.md §9.1, §10.3 y §12.1).
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio.
  */
@@ -21,20 +21,20 @@ static void make_song(u16 n)
     strcpy(song.name, "TEST");
     song.bpm = 60; song.n = n; song.chart = pool;
 }
-static Hit mk(u8 lane, u32 t) { Hit h; h.lane = lane; h.song_ms = t; return h; }
+static Hit_signal mk(u8 lane, u32 t) { Hit_signal h; h.lane = lane; h.t_ms = t; return h; }
 
-/* ------------------------------------------------------------ game_engine */
+/* --------------------------------------------------------- game_manager */
 void test_engine(void)
 {
-    GameState gs;
-    Hit h;
+    Game_status gs;
+    Hit_signal h;
     u16 i;
     memset(&gs, 0, sizeof gs);
     make_song(30);
 
-    gs.theme = THEME_LIGHT;
+    gs.light_mode = THEME_LIGHT;
     game_reset(&gs);
-    CHECK(gs.rock == ROCK_START && gs.score == 0 && gs.theme == THEME_LIGHT);
+    CHECK(gs.rock == ROCK_START && gs.score == 0 && gs.light_mode == THEME_LIGHT);
 
     /* Acierto justo en los bordes de la ventana (+-120 ms) y fallo fuera de ella. */
     h = mk(0, 3000 - HIT_WIN_MS);          CHECK(game_judge_hit(&gs, &song, &h) == 1);
@@ -102,7 +102,7 @@ void test_engine(void)
     CHECK(gs.rcv_fx[0] == 0);
 }
 
-/* -------------------------------------------------------------- joy_logic */
+/* ------------------------------------------- joystick_aconditioner_logic */
 /* Repite la muestra hasta que el detector decide (espera JOY_SETTLE_N muestras). */
 static int jd(JoyDet *d, u16 x, u16 y)
 {
@@ -191,7 +191,7 @@ void test_formats(void)
     CHECK(records_insert(r, &n, "ONE", 10) == 0 && n == 1);
 }
 
-/* -------------------------------------------------------------- audio_seq */
+/* -------------------------------------------------------- sound_manager */
 void test_audio_seq(void)
 {
     Buzzer_t bz;

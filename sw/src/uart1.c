@@ -1,5 +1,5 @@
 /*
- * uart_hal.c - Acceso mínimo a la UART1 del PS (consola del PC, 115200 8N1).
+ * uart1.c - Acceso mínimo a la UART1 del PS (consola del PC, 115200 8N1).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: uso de xil_printf / lectura de la UART de la AYU09 (helloworld.c); aquí la

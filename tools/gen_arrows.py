@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-gen_arrows.py - Genera los sprites de las flechas de Sep Hero (sw/src/arrows.c/.h).
+gen_arrows.py - Genera los sprites de las flechas de Sep Hero (sw/src/screen_manager_arrows.c/.h).
 
 Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
 (SepHero_BD.pdf página 4, docs/MANUAL_IMPLEMENTACION.md §9.5.3 y §12.3).
@@ -12,13 +12,13 @@ en una grilla de 18x18 y la rota para las otras 3 direcciones. Produce dos juego
                                            0x8410 = borde
   arrow_rcv[4][18*18]  receptores (solo el contorno): 0x0000 o 0xFFFF
 
-Son MASCARAS en RGB565: render.c reemplaza cada valor por el color del carril (o azul
+Son MASCARAS en RGB565: screen_manager.c reemplaza cada valor por el color del carril (o azul
 en star power), un tono más oscuro para el borde y el color de fondo del tema. Así un
 mismo sprite sirve para todos los colores y para los dos temas.
 
 Índice del primer subíndice = Lane: 0 IZQ, 1 ARRIBA, 2 ABAJO, 3 DER.
 
-Uso:  python tools/gen_arrows.py          (escribe sw/src/arrows.c, sw/src/arrows.h
+Uso:  python tools/gen_arrows.py          (escribe sw/src/screen_manager_arrows.c, sw/src/screen_manager_arrows.h
                                            y tools/out/arrows_preview.ppm)
 """
 import os
@@ -110,15 +110,15 @@ HEADER = """/*
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio.
  *
  * Son máscaras RGB565: 0x0000 = transparente (fondo), 0xFFFF = cuerpo, 0x8410 = borde.
- * render.c las colorea al dibujar. Primer índice = Lane (IZQ, ARRIBA, ABAJO, DER).
+ * screen_manager.c las colorea al dibujar. Primer índice = Lane (IZQ, ARRIBA, ABAJO, DER).
  * Quedan en flash (const). Cubre parte de AC2 (arreglos bidimensionales).
  */
 """
 
 
 def write_c(spr, rcv):
-    h = HEADER % "h" + """#ifndef ARROWS_H
-#define ARROWS_H
+    h = HEADER % "h" + """#ifndef SCREEN_MANAGER_ARROWS_H
+#define SCREEN_MANAGER_ARROWS_H
 
 #include "game_types.h"
 
@@ -130,13 +130,13 @@ def write_c(spr, rcv):
 extern const u16 arrow_spr[N_LANES][ARROW_W * ARROW_H];   /* notas (rellenas)      */
 extern const u16 arrow_rcv[N_LANES][ARROW_W * ARROW_H];   /* receptores (contorno) */
 
-#endif /* ARROWS_H */
+#endif /* SCREEN_MANAGER_ARROWS_H */
 """
-    c = HEADER % "c" + '#include "arrows.h"\n\n' + c_array("arrow_spr", spr) + "\n\n" + \
+    c = HEADER % "c" + '#include "screen_manager_arrows.h"\n\n' + c_array("arrow_spr", spr) + "\n\n" + \
         c_array("arrow_rcv", rcv) + "\n"
-    with open(os.path.join(ROOT, "sw", "src", "arrows.h"), "w", newline="\n") as f:
+    with open(os.path.join(ROOT, "sw", "src", "screen_manager_arrows.h"), "w", newline="\n") as f:
         f.write(h)
-    with open(os.path.join(ROOT, "sw", "src", "arrows.c"), "w", newline="\n") as f:
+    with open(os.path.join(ROOT, "sw", "src", "screen_manager_arrows.c"), "w", newline="\n") as f:
         f.write(c)
 
 
@@ -171,4 +171,4 @@ if __name__ == "__main__":
     s, r = build()
     write_c(s, r)
     write_preview(s, r)
-    print("arrows.c / arrows.h generados (%d sprites de %dx%d)" % (8, N, N))
+    print("screen_manager_arrows.c / screen_manager_arrows.h generados (%d sprites de %dx%d)" % (8, N, N))

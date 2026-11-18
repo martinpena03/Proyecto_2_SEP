@@ -1,11 +1,11 @@
 /*
- * joy_logic.c - Detector de dirección del joystick (Joystick_aconditioner).
+ * joystick_aconditioner_logic.c - Detector de dirección del joystick (Joystick_aconditioner).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (SepHero_BD.pdf página 4 y docs/MANUAL_IMPLEMENTACION.md §8.3).
  *
  * Portable: se prueba en el PC (tests/test_joy.c). En la placa lo llama joy_sample()
- * desde la interrupción de axi_timer_1 cada 2 ms (input.c).
+ * desde la interrupción de axi_timer_1 cada 2 ms (joystick_aconditioner.c).
  *
  * Reglas:
  *   - dx = x - x0, dy = y - y0 (ADC de 10 bits, centro calibrado).

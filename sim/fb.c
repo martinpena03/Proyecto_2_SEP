@@ -4,9 +4,9 @@
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (docs/MANUAL_IMPLEMENTACION.md §12.2).
  *
- * Reemplaza a lcd_fast.c en el PC. Lo usan el simulador (sim/main_sim.c), que guarda
+ * Reemplaza a screen_manager_lcd.c en el PC. Lo usan el simulador (sim/main_sim.c), que guarda
  * las pantallas como .ppm, y los tests (tests/test_render.c), que además comprueban que
- * render.c nunca dibuja fuera de los 128x128 píxeles y cuántos píxeles envía por frame
+ * screen_manager.c nunca dibuja fuera de los 128x128 píxeles y cuántos píxeles envía por frame
  * (en la placa cada píxel cuesta ~5 us de SPI).
  */
 #include <stdio.h>

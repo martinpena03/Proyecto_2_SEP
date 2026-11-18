@@ -14,8 +14,8 @@ extern int   stub_song_running;
 extern int   stub_play_mode;                 /* último input_set_play_mode()            */
 extern int   stub_flush_count;
 extern u16   stub_joy_umbral, stub_shake_mg; /* últimos umbrales aplicados              */
-extern u8    stub_crowd;                     /* valor que devuelve sensors_crowd_level  */
-extern Theme stub_theme;                     /* valor que devuelve theme_current        */
+extern u8    stub_crowd;                     /* valor que devuelve sensors_crowd_noise  */
+extern Theme stub_theme;                     /* valor que devuelve light_mode_current        */
 extern u16   stub_tone_f;                    /* última frecuencia pedida al buzzer      */
 extern u32   stub_tone_calls;
 extern int   stub_deb_inits;                 /* llamadas válidas a debouncer_init       */

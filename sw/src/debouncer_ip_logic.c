@@ -1,10 +1,10 @@
 /*
- * debouncer_logic.c - Validación y valores por defecto de la configuración (AO3).
+ * debouncer_ip_logic.c - Validación y valores por defecto de la configuración (AO3).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (docs/MANUAL_IMPLEMENTACION.md §8.2).
  *
- * Portable (sin headers de Xilinx): lo usan el driver del IP (debouncer_axi.c), el
+ * Portable (sin headers de Xilinx): lo usan el driver del IP (debouncer_ip.c), el
  * lector de la consola (uart_config.c) y los tests del PC.
  */
 #include "interfaces.h"

@@ -14,7 +14,7 @@
  */
 #include <stdio.h>
 #include <string.h>
-#include "game_fsm.h"
+#include "state_machine.h"
 #include "stubs.h"
 #include "fb.h"
 
@@ -24,7 +24,7 @@ static const char *outdir = ".";
 static void frame(UiEvent ev)
 {
     stub_advance(30);
-    if (stub_song_running && ctx.gs.star_ms) ctx.gs.star_ms = (ctx.gs.star_ms > 30u) ? ctx.gs.star_ms - 30u : 0u;
+    if (stub_song_running && ctx.game_status.star_ms) ctx.game_status.star_ms = (ctx.game_status.star_ms > 30u) ? ctx.game_status.star_ms - 30u : 0u;
     fsm_step(&ctx, ev);
     render_frame(&ctx);
 }
@@ -42,7 +42,7 @@ static void play_until(u32 until, u16 miss_every)
 {
     static u16 next;
     if (stub_song_ms < 100u) next = 0;
-    while (ctx.st == ST_PLAY && stub_song_ms < until) {
+    while (ctx.state == ST_PLAY && stub_song_ms < until) {
         while (next < ctx.song.n && ctx.song.chart[next].t_ms <= stub_song_ms + 30u) {
             if (miss_every == 0u || (next % miss_every) != 0u) {
                 stub_push_hit((u8)ctx.song.chart[next].lane, ctx.song.chart[next].t_ms);
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     frame(UI_BACK);
     /* Star power. */
     play_until(9600, 0);
-    frame(UI_SHAKE);
+    frame(UI_POWER_UP_ENABLE);
     stub_crowd = 85;
     play_until(15300, 0);                   shot("09_play_star_power");
     /* Tema claro con rock meter bajo. */

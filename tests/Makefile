@@ -9,8 +9,8 @@
 CC      := gcc
 CFLAGS  := -std=c99 -Wall -Wextra -g -I../sw/src -I../sw/src/lib
 SRC     := ../sw/src
-PORTABLE := game_engine.c game_fsm.c render.c text.c arrows.c audio_seq.c sd_formats.c \
-            song_embedded.c debouncer_logic.c joy_logic.c uart_config.c
+PORTABLE := game_manager.c state_machine.c screen_manager.c screen_manager_text.c screen_manager_arrows.c sound_manager.c sd_manager_formats.c \
+            sd_manager_songs.c debouncer_ip_logic.c joystick_aconditioner_logic.c uart_config.c
 FONTS   := $(addprefix $(SRC)/lib/,font8.c font12.c font16.c font20.c font24.c)
 COMMON  := $(addprefix $(SRC)/,$(PORTABLE)) $(FONTS) stubs.c ../sim/fb.c
 BUILD   := build

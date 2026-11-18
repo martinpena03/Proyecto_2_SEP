@@ -1,11 +1,11 @@
 /*
- * sd_formats.c - Formatos de archivo de la microSD (SD_Manager, AC7).
+ * sd_manager_formats.c - Formatos de archivo de la microSD (SD_Manager, AC7).
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (docs/MANUAL_IMPLEMENTACION.md §10.3).
  *
  * Portable y sin heap ni sscanf: se prueba en el PC (tests/test_formats.c).
- * La lectura y escritura física de la tarjeta está en sd_storage.c (xilffs).
+ * La lectura y escritura física de la tarjeta está en sd_manager.c (xilffs).
  *
  * SONGn.SHC (texto ASCII; '#' inicia un comentario):
  *     NAME=Oda a la Alegria
