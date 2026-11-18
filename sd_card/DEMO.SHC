@@ -1,0 +1,15 @@
+# SEP HERO chart v1
+# Generado por tools/make_chart.py (no editar a mano; editar la melodia alla)
+NAME=Demo
+BPM=60
+# t_ms  lane(0=IZQ 1=ARRIBA 2=ABAJO 3=DER)  freq_hz  dur_ms
+3000 1 1047 300
+4000 2 880 300
+5000 2 880 300
+6000 0 784 300
+7000 3 1319 300
+8000 1 1047 300
+9000 0 784 300
+10000 2 880 300
+11000 3 1319 300
+12000 1 1047 300

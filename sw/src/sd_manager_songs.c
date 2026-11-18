@@ -1,10 +1,29 @@
 /*
  * sd_manager_songs.c - Charts embebidos (respaldo cuando no hay microSD).
  *
- * ARCHIVO GENERADO por tools/shc2c.py desde sd_card/SONGn.SHC: no editar a mano.
+ * ARCHIVO GENERADO por tools/shc2c.py desde sd_card/DEMO.SHC y SONGn.SHC: no editar a mano.
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  */
 #include "interfaces.h"
+
+/* DEMO.SHC */
+const char g_demo_shc[] =
+    "# SEP HERO chart v1\n"
+    "# Generado por tools/make_chart.py (no editar a mano; editar la melodia alla)\n"
+    "NAME=Demo\n"
+    "BPM=60\n"
+    "# t_ms  lane(0=IZQ 1=ARRIBA 2=ABAJO 3=DER)  freq_hz  dur_ms\n"
+    "3000 1 1047 300\n"
+    "4000 2 880 300\n"
+    "5000 2 880 300\n"
+    "6000 0 784 300\n"
+    "7000 3 1319 300\n"
+    "8000 1 1047 300\n"
+    "9000 0 784 300\n"
+    "10000 2 880 300\n"
+    "11000 3 1319 300\n"
+    "12000 1 1047 300\n";
+const u32 g_demo_shc_len = (u32)(sizeof(g_demo_shc) - 1u);
 
 /* SONG1.SHC */
 const char g_song1_shc[] =

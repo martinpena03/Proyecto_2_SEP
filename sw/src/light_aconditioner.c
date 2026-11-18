@@ -44,7 +44,7 @@
 
 static Opt3001Cfg g_cfg = { 40, 80 };
 static int g_sensor_ok;
-static volatile Theme g_theme = THEME_DARK;
+static volatile Theme g_light_mode = THEME_DARK;
 volatile u32 g_theme_changes;
 
 /* Convierte lux enteros al formato exponente/mantisa del sensor (resolución 0,01 lux). */
@@ -81,7 +81,7 @@ void opt3001_arm(Theme t)
 /* Verifica los IDs, escribe CONFIG, elige el tema inicial y arma la ventana. */
 int opt3001_init(const Opt3001Cfg *cfg)
 {
-    u16 man, dev, lux;
+    u16 man, dev, light_level;
     if (cfg != NULL) g_cfg = *cfg;
     man = opt_read_reg(OPT_MANUF);
     dev = opt_read_reg(OPT_DEVID);
@@ -91,11 +91,11 @@ int opt3001_init(const Opt3001Cfg *cfg)
     xil_printf("[OPT] CONFIG escrito=0x%04x releido=0x%04x\r\n", OPT_CFG_VAL, opt_read_reg(OPT_CONFIG));
     if ((opt_read_reg(OPT_CONFIG) & 0xFE1Fu) != (OPT_CFG_VAL & 0xFE1Fu)) return -2;
     usleep(150000);                                     /* primera conversión (100 ms) */
-    lux = opt3001_read_lux();
-    g_theme = (lux >= (u16)((g_cfg.lo_lux + g_cfg.hi_lux) / 2u)) ? THEME_LIGHT : THEME_DARK;
-    opt3001_arm(g_theme);
+    light_level = opt3001_read_lux();
+    g_light_mode = (light_level >= (u16)((g_cfg.lo_lux + g_cfg.hi_lux) / 2u)) ? THEME_LIGHT : THEME_DARK;
+    opt3001_arm(g_light_mode);
     (void)opt_read_reg(OPT_CONFIG);                     /* borra un latch pendiente */
-    xil_printf("[OPT] lux=%d tema=%s\r\n", lux, (g_theme == THEME_LIGHT) ? "CLARO" : "OSCURO");
+    xil_printf("[OPT] lux=%d tema=%s\r\n", light_level, (g_light_mode == THEME_LIGHT) ? "CLARO" : "OSCURO");
     return 0;
 }
 
@@ -105,17 +105,17 @@ void theme_init(int sensor_ok, const Opt3001Cfg *cfg)
 {
     g_sensor_ok = sensor_ok;
     if (cfg != NULL) g_cfg = *cfg;
-    if (!sensor_ok) g_theme = THEME_DARK;               /* sin sensor: tema fijo */
+    if (!sensor_ok) g_light_mode = THEME_DARK;               /* sin sensor: tema fijo */
 }
 
-Theme theme_current(void) { return g_theme; }
+Theme light_mode_current(void) { return g_light_mode; }
 
 /* Desde main, en cada vuelta: cuando la interrupción de axi_timer_1 levantó g_opt_poll
  * (cada 200 ms), lee CONFIG por I2C. Si el comparador del sensor enganchó FH (mucha luz)
  * o FL (poca luz), cambia el tema, rearma la ventana e imprime el aviso. */
 void theme_task(void)
 {
-    u16 cfg, lux;
+    u16 cfg, light_level;
     Theme nt;
     const char *src = "comparador OPT3001 (revisado por la interrupcion de axi_timer_1)";
 
@@ -123,25 +123,25 @@ void theme_task(void)
     g_opt_poll = 0;
     cfg = opt_read_reg(OPT_CONFIG);                     /* borra el latch; trae FH / FL */
     if ((cfg & (OPT_FLAG_FH | OPT_FLAG_FL)) == 0u) return;
-    lux = opt3001_read_lux();
-    nt  = g_theme;
-    if (cfg & OPT_FLAG_FL)      nt = THEME_DARK;        /* lux < LOW_LIMIT  */
-    else if (cfg & OPT_FLAG_FH) nt = THEME_LIGHT;       /* lux > HIGH_LIMIT */
-    else if (lux < g_cfg.lo_lux) nt = THEME_DARK;
-    else if (lux > g_cfg.hi_lux) nt = THEME_LIGHT;
+    light_level = opt3001_read_lux();
+    nt  = g_light_mode;
+    if (cfg & OPT_FLAG_FL)      nt = THEME_DARK;        /* light_level < LOW_LIMIT  */
+    else if (cfg & OPT_FLAG_FH) nt = THEME_LIGHT;       /* light_level > HIGH_LIMIT */
+    else if (light_level < g_cfg.lo_lux) nt = THEME_DARK;
+    else if (light_level > g_cfg.hi_lux) nt = THEME_LIGHT;
 
-    if (nt != g_theme) {
-        g_theme = nt;
+    if (nt != g_light_mode) {
+        g_light_mode = nt;
         g_theme_changes++;
         if (nt == THEME_LIGHT)
             xil_printf("\r\n*** [AO2] Mucha luz *** lux=%d (> %d)  fuente: %s -> modo claro, LEDs ON\r\n",
-                       lux, g_cfg.hi_lux, src);
+                       light_level, g_cfg.hi_lux, src);
         else
             xil_printf("\r\n*** [AO2] Poca luz *** lux=%d (< %d)  fuente: %s -> modo oscuro, LEDs OFF\r\n",
-                       lux, g_cfg.lo_lux, src);
+                       light_level, g_cfg.lo_lux, src);
         opt3001_arm(nt);
     }
     (void)opt_read_reg(OPT_CONFIG);                     /* limpia eventos pendientes */
-    xil_printf("[OPT] evento lux=%d CONFIG=0x%04x tema=%s\r\n", lux, cfg,
-               (g_theme == THEME_LIGHT) ? "CLARO" : "OSCURO");
+    xil_printf("[OPT] evento lux=%d CONFIG=0x%04x tema=%s\r\n", light_level, cfg,
+               (g_light_mode == THEME_LIGHT) ? "CLARO" : "OSCURO");
 }

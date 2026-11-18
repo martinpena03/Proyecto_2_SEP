@@ -26,10 +26,11 @@ typedef int32_t  s32;
 /* Parámetros del juego                                               */
 /* ------------------------------------------------------------------ */
 #define N_LANES           4u       /* carriles: <- ^ v -> (direcciones del joystick)     */
-#define HIT_WIN_MS        200u     /* |t_golpe - t_nota| máximo para un acierto (ampliado
+#define HIT_WIN_MS        400u     /* |t_golpe - t_nota| máximo para un acierto (ampliado
                                     * de 120 a 200 ms tras probar en la placa)           */
 #define PTS_NOTA          100u     /* puntos por nota (x2 con star power)                */
-#define STAR_STREAK       10u      /* aciertos seguidos que llenan la barra de poder     */
+#define STAR_STREAK       5u       /* aciertos seguidos que llenan la barra de poder
+                                    * (bajado de 10 a 5 para probarlo en el demo)      */
 #define STAR_MS           20000u   /* duración del star power                            */
 #define ROCK_MAX          20       /* tope del rock meter                                */
 #define ROCK_START        10       /* rock meter inicial (mitad de ROCK_MAX)             */
@@ -43,12 +44,19 @@ typedef int32_t  s32;
 #define LEADIN_MS         3000u    /* cuenta 3-2-1: la 1.a nota del chart cae >= 3 s     */
 #define SONG_TAIL_MS      2000u    /* margen tras la última nota para declarar el fin    */
 #define NOTE_LOOKAHEAD_MS 1500u    /* tiempo que tarda una nota en recorrer la pista     */
+#define LEVEL_DEMO        0u       /* el nivel Demo es el primero de la selección        */
+#define DEMO_KEY_MS       500u     /* Demo: la flecha se muestra en el LCD 500 ms,
+                                    * centrados en el instante de la nota              */
 
 #define TICK1_MS          2u       /* periodo de axi_timer_1                             */
 #define SENS_DIV          5u       /* acelerómetro cada 5 ticks = 10 ms                  */
 #define FRAME_DIV         15u      /* paso de la FSM cada 15 ticks = 30 ms               */
 #define OPT_POLL_DIV      100u     /* OPT3001 cada 100 ticks = 200 ms                    */
 #define HIT_Q_LEN         16u      /* cola de golpes (potencia de 2)                     */
+#define JOY_TICK_MS       2u       /* el joystick se muestrea en cada tick de timer1     */
+#define JOY_UMBRAL_DEF    180u     /* desviación (cuentas de 10 bits) para "dirección"   */
+#define JOY_HIST          60u      /* vuelve a centro bajo JOY_UMBRAL - JOY_HIST         */
+#define JOY_SETTLE_N      3u       /* muestras de espera antes de decidir la dirección   */
 #define UI_Q_LEN          8u       /* cola de eventos de interfaz (potencia de 2)        */
 
 #define ENCORE_WIN_MS     5000u    /* ventana del grito en GAME OVER                     */
@@ -91,32 +99,34 @@ typedef struct {
     u8  charge;                /* aciertos seguidos desde el último reinicio        */
     volatile u32 star_ms;      /* ms restantes de star power (lo descuenta timer0)  */
     s8  rock;                  /* rock meter; 0 => GAME OVER                        */
-    u8  theme;                 /* Theme                                             */
-    u8  crowd;                 /* nivel del público 0..100 (micrófono)              */
+    u8  light_mode;            /* Light_mode: Theme (Light_aconditioner)            */
+    u8  crowd_noise;           /* Crowd_noise: nivel del público 0..100 (micrófono) */
     u16 next_note;             /* primera nota sin juzgar                           */
     u16 hits, misses;
     u8  judged[(MAX_NOTES + 7u) / 8u];   /* bitset: nota i ya juzgada               */
     u8  rcv_fx[N_LANES];       /* frames de destello que le quedan al receptor      */
     u8  rcv_fx_kind[N_LANES];  /* 1 = acierto, 2 = fallo                            */
     u8  encore_done;
-} GameState;
+} Game_status;
 
 typedef enum { RESULT_NONE = 0, RESULT_WIN = 1, RESULT_LOSE = 2 } GameResult;
 
-/* Golpe: flecha del joystick con su sello de tiempo (lo encola timer1_isr). */
+/* Golpe: flecha con su sello de tiempo. La encola el joystick (timer1_isr) o el
+ * autoplay de la consola; solo las del joystick se imprimen por consola. */
 typedef struct {
-    u8  lane;      /* Lane */
-    u32 song_ms;
-} Hit;
+    u8  lane;      /* Lane                                     */
+    u8  from_joy;  /* 1 = vino del joystick, 0 = autoplay      */
+    u32 t_ms;      /* instante del golpe en ms de canción      */
+} Hit_signal;
 
 typedef struct {
     char name[4];   /* 3 letras + '\0' */
     u32  score;
 } Record;
 
-/* Eventos de interfaz. Las flechas del juego NO pasan por aquí (van a la cola de Hit). */
+/* Eventos de interfaz. Las flechas del juego NO pasan por aquí (van a la cola de Hit_signal). */
 typedef enum {
-    UI_NONE = 0, UI_OK, UI_BACK, UI_UP, UI_DOWN, UI_SHAKE
+    UI_NONE = 0, UI_OK, UI_BACK, UI_UP, UI_DOWN, UI_POWER_UP_ENABLE
 } UiEvent;
 
 /* Macros de apoyo para el bitset judged[] (AC2). */

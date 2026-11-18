@@ -168,15 +168,15 @@ haya tarjeta:
 | `btn_raw[2:0]` | Pines → `Debouncer_IP/btn_in[2:0]` |
 | `Btn_edges[2:0] (OK, Back/Pause)` | `deb_isr` lee `EDGE` → `ui_push(UI_OK / UI_BACK)` |
 | `joy x, y` / `mic` / `aX, aY, aZ` | `adc_read_raw(ch)` desde `timer1_isr` |
-| `Hit{lane, t_ms}` | Cola SPSC de `Hit` (`hit_pop`) |
+| `Hit_signal{lane, t_ms}` | Cola SPSC de `Hit_signal` (`hit_pop`) |
 | `Joy_dir (menú)` | `ui_push(UI_UP / UI_DOWN)` fuera del estado JUEGO |
-| `Crowd_noise` | `sensors_crowd_level()` |
-| `Power_up_enable` | Evento `UI_SHAKE` → `game_try_star_power()` |
-| `Light_mode` | `theme_current()` |
-| `song_ms, frame_flag` | `clock_song_ms()`, `g_frame_flag` |
+| `Crowd_noise` | `sensors_crowd_noise()` |
+| `Power_up_enable` | Evento `UI_POWER_UP_ENABLE` → `game_try_star_power()` |
+| `Light_mode` | `light_mode_current()` |
+| `song_ms, frame_flag` | `clock_song_ms()`, `frame_flag` |
 | `Game_on_off` / `Reset` / `Game_over_signal` | `clock_song_run()` + `buzzer_play/stop` / `game_reset()` / retorno de `game_is_over()` |
-| `State (enum)` | `ctx->st` (`FsmState`) |
-| `Game_status`, `Notas a desplegar` | `const GameState *`, `const Song *` + `now`, entregados a `render_frame()` |
+| `State (enum)` | `ctx->state` (`FsmState`) |
+| `Game_status`, `Notas a desplegar` | `const Game_status *`, `const Song *` + `now`, entregados a `render_frame()` |
 | `Song chart (Note[])`, `Record[5]` | `sd_load_song()`, `sd_load_records()`, `sd_save_records()` |
 | `Song_enabler / Select_song` | `buzzer_play(&bz, &song)` / `buzzer_stop()` / selección de archivo |
 | `Melodía (freq, dur)` | `Note[]` del chart |
@@ -213,7 +213,7 @@ haya tarjeta:
 
 **Reglas de concurrencia:**
 
-- Toda variable compartida entre ISR y `main` es `volatile`. Las colas (`Hit`, `UiEvent`) son
+- Toda variable compartida entre ISR y `main` es `volatile`. Las colas (`Hit_signal`, `UiEvent`) son
   anillos **SPSC** (un productor, la ISR; un consumidor, `main`) con tamaño potencia de 2 e índices
   `volatile u8`. No hace falta deshabilitar interrupciones para consumirlas. La cola de UI tiene
   dos productores (`timer1_isr` y `deb_isr`), pero como las ISR no se anidan, sus `ui_push` nunca
@@ -959,14 +959,14 @@ typedef struct {
     u8  rcv_fx[N_LANES];       /* frames de destello del receptor                   */
     u8  rcv_fx_kind[N_LANES];  /* 1 = acierto, 2 = fallo                            */
     u8  encore_done;
-} GameState;
+} Game_status;
 
 typedef enum { RESULT_NONE = 0, RESULT_WIN = 1, RESULT_LOSE = 2 } GameResult;
 
-typedef struct { u8 lane; u32 song_ms; } Hit;     /* lane = Lane */
+typedef struct { u8 lane; u32 song_ms; } Hit_signal;     /* lane = Lane */
 
-/* Eventos de interfaz. Las flechas del juego NO pasan por aquí (van a la cola de Hit). */
-typedef enum { UI_NONE = 0, UI_OK, UI_BACK, UI_UP, UI_DOWN, UI_SHAKE } UiEvent;
+/* Eventos de interfaz. Las flechas del juego NO pasan por aquí (van a la cola de Hit_signal). */
+typedef enum { UI_NONE = 0, UI_OK, UI_BACK, UI_UP, UI_DOWN, UI_POWER_UP_ENABLE } UiEvent;
 ```
 
 **`interfaces.h`: cambios**
@@ -986,11 +986,11 @@ u32  clock_song_ms(void);             /* ms de canción (corre solo si run = 1) 
 void clock_song_set(u32 ms);
 void clock_song_run(int run);
 
-/* event_queues.c (A): modo del joystick. 1 = JUEGO (direcciones -> cola de Hit);
+/* event_queues.c (A): modo del joystick. 1 = JUEGO (direcciones -> cola de Hit_signal);
  * 0 = menús (ARRIBA/ABAJO -> UI_UP/UI_DOWN). Lo fija la FSM al entrar y salir de ST_PLAY. */
 void input_set_play_mode(int play);
 void input_set_joy_umbral(u16 umbral);
-int  hit_pop(Hit *out);               /* 0 = vacía */
+int  hit_pop(Hit_signal *out);               /* 0 = vacía */
 UiEvent ui_pop(void);
 void input_flush(void);               /* vacía ambas colas */
 
@@ -1011,7 +1011,7 @@ int  sd_load_records(SdCtx *sd, Record *r, u8 max);              /* devuelve n  
 int  sd_save_records(SdCtx *sd, const Record *r, u8 n);
 
 /* game_manager.c (B): game_is_over devuelve GameResult. */
-int  game_is_over(const GameState *gs, const Song *song, u32 song_ms);
+int  game_is_over(const Game_status *gs, const Song *song, u32 song_ms);
 
 /* sound_manager.c (B) */
 void buzzer_play_jingle(Buzzer_t *bz, const Note *notes, u16 n, u8 loop);
@@ -1067,7 +1067,7 @@ static XScuGic gic;
 static XTmrCtr tmr0, tmr1;
 static volatile u32 g_sys_ms, g_song_ms;
 static volatile u8  g_song_run, g_sens_div, g_frame_div;
-volatile u8 g_frame_flag;        /* lo consume main (ver §9.6) */
+volatile u8 frame_flag;        /* lo consume main (ver §9.6) */
 
 u32  clock_sys_ms(void)        { return g_sys_ms; }
 u32  clock_song_ms(void)       { return g_song_ms; }
@@ -1080,7 +1080,7 @@ static void timer0_cb(void *ref, u8 n)          /* 1 ms: reloj de canción + buz
     g_sys_ms++;
     if (g_song_run) {
         g_song_ms++;
-        if (ctx_gs(ctx)->star_ms) ctx_gs(ctx)->star_ms--;   /* diagrama: star_ms-- en timer0 */
+        if (ctx_game_status(ctx)->star_ms) ctx_game_status(ctx)->star_ms--;   /* diagrama: star_ms-- en timer0 */
     }
     buzzer_tick(ctx_bz(ctx), g_song_ms);                     /* el secuenciador elige su reloj */
 }
@@ -1090,7 +1090,7 @@ static void timer1_cb(void *ref, u8 n)          /* 2 ms: joystick, sensores, fra
     (void)ref; (void)n;
     joy_sample();                                            /* cada 2 ms (event_queues.c) */
     if (++g_sens_div  >= SENS_DIV)  { g_sens_div  = 0; sensors_sample(); }    /* 10 ms */
-    if (++g_frame_div >= FRAME_DIV) { g_frame_div = 0; g_frame_flag = 1; }    /* 30 ms */
+    if (++g_frame_div >= FRAME_DIV) { g_frame_div = 0; frame_flag = 1; }    /* 30 ms */
 }
 
 int isr_init(GameCtx *ctx)
@@ -1132,7 +1132,7 @@ int isr_init(GameCtx *ctx)
 }
 ```
 
-(`ctx_gs()` y `ctx_bz()` son accesores *inline* de `state_machine.h`, que evitan exponer `GameCtx`
+(`ctx_game_status()` y `ctx_bz()` son accesores *inline* de `state_machine.h`, que evitan exponer `GameCtx`
 en `isr_handler.c`; también sirven punteros globales inicializados en `isr_init`).
 
 **Aceptación:** `clock_sys_ms()` avanza 60000 ± 5 por minuto (contrastar con `XTime_GetTime`).
@@ -1202,13 +1202,13 @@ Tiene tests en el PC.
 **Colas SPSC:**
 
 ```c
-typedef struct { Hit buf[HIT_Q_LEN]; volatile u8 head, tail; } HitQ;   /* head: ISR, tail: main */
+typedef struct { Hit_signal buf[HIT_Q_LEN]; volatile u8 head, tail; } HitQ;   /* head: ISR, tail: main */
 static HitQ hq;
-static void hitq_push(const Hit *h) {
+static void hitq_push(const Hit_signal *h) {
     u8 nh = (u8)((hq.head + 1u) & (HIT_Q_LEN - 1u));
     if (nh != hq.tail) { hq.buf[hq.head] = *h; hq.head = nh; }   /* llena: se descarta */
 }
-int hit_pop(Hit *out) {
+int hit_pop(Hit_signal *out) {
     if (hq.tail == hq.head) return 0;
     *out = hq.buf[hq.tail]; hq.tail = (u8)((hq.tail + 1u) & (HIT_Q_LEN - 1u)); return 1;
 }
@@ -1260,7 +1260,7 @@ void joy_sample(void)
     if (d < 0) return;
     if (g_play_mode) {                                  /* JUEGO: golpe con sello de tiempo */
         if (clock_sys_ms() < g_shake_mute_until) return; /* ver §8.4 */
-        Hit h = { (u8)d, clock_song_ms() };
+        Hit_signal h = { (u8)d, clock_song_ms() };
         hitq_push(&h);
     } else if (d == ARRIBA) ui_push(UI_UP);             /* menús: solo el eje vertical */
     else if (d == ABAJO)    ui_push(UI_DOWN);
@@ -1326,7 +1326,7 @@ comando del canal k+1 mientras se recibe el k), con n+1 transferencias en vez de
 1. **Shake (Accelerometer_aconditioner → Power_up_enable):** `v = (ax−512, ay−512, az−512)`.
    Condición `|v|² · 10⁶ > ((1000 + umbral_mg) · cpg)²` (en `u64`, sin raíz). Equivale a
    `|a| − 1 g > UMBRAL_SHAKE`. Exige **2 muestras seguidas** y un período refractario de 500 ms.
-   Al cumplirse ⇒ `ui_push(UI_SHAKE)`.
+   Al cumplirse ⇒ `ui_push(UI_POWER_UP_ENABLE)`.
    *Nota de jugabilidad:* al sacudir la placa el joystick puede desviarse. Durante los 300 ms
    siguientes a un shake, `joy_sample` descarta los golpes (`g_shake_mute_until`).
 2. **Micrófono → público (Microphone_aconditioner → Crowd_noise):** anillo de las últimas 8
@@ -1334,7 +1334,7 @@ comando del canal k+1 mientras se recibe el k), con n+1 transferencias en vez de
    `MIC_FULL` calibrable (~300) y suavizado EMA `crowd = (3·crowd + lvl) / 4`. A 100 Hz el audio
    queda submuestreado; para estimar la **envolvente** (intensidad) basta.
 
-`sensors_crowd_level()` devuelve `crowd`.
+`sensors_crowd_noise()` devuelve `crowd`.
 
 ### 8.5 `light_aconditioner.c` y `theme.c`: sensor de luz por interrupción (Light_aconditioner; AO1, AO2)
 
@@ -1377,9 +1377,9 @@ hi_lux = 80 }`, valores calibrables en el lugar:
 2. `theme_task()` (la parte "theme_isr" del diagrama, ejecutada en `main`): si `opt_pending`, lo
    limpia; lee `CONFIG` (borra el latch y obtiene FH/FL); lee `RESULT` y decide el tema (FL ⇒
    OSCURO, FH ⇒ CLARO; si no hay flags, compara lux con la ventana); escribe los nuevos LOW/HIGH;
-   relee `CONFIG` para limpiar eventos pendientes; actualiza `g_theme` e imprime
+   relee `CONFIG` para limpiar eventos pendientes; actualiza `g_light_mode` e imprime
    `"[OPT] lux=%d tema=%s LOW=0x%04x HIGH=0x%04x"`.
-3. `theme_current()` (`Light_mode`) devuelve `g_theme`. El render detecta el cambio y redibuja
+3. `light_mode_current()` (`Light_mode`) devuelve `g_light_mode`. El render detecta el cambio y redibuja
    todo.
 
 El estado inicial se fija en `opt3001_init`: se lee `RESULT`, se elige el tema comparando con
@@ -1492,7 +1492,7 @@ IP: DEB_MS=15 BTN_MASK=0x7 (releidos del hardware)
 ### 9.1 `game_manager.c` (Game Manager, portable)
 
 ```c
-void game_reset(GameState *gs);   /* memset 0; rock = ROCK_START; star_phase = CHARGING; theme se conserva */
+void game_reset(Game_status *gs);   /* memset 0; rock = ROCK_START; star_phase = CHARGING; theme se conserva */
 ```
 
 **`game_judge_hit(gs, song, hit)`**: busca la nota más cercana, no juzgada, del carril (flecha)
@@ -1501,9 +1501,9 @@ del golpe:
 ```
 best = -1; best_dt = HIT_WIN_MS + 1; other_in_window = 0
 for i in [gs->next_note, song->n):
-    if chart[i].t_ms > hit->song_ms + HIT_WIN_MS: break        // el chart está ordenado por t_ms
+    if chart[i].t_ms > hit->t_ms + HIT_WIN_MS: break        // el chart está ordenado por t_ms
     if judged(i): continue
-    dt = |chart[i].t_ms − hit->song_ms|
+    dt = |chart[i].t_ms − hit->t_ms|
     if dt > HIT_WIN_MS: continue
     if chart[i].lane == hit->lane:
         if dt < best_dt: best = i; best_dt = dt
@@ -1562,15 +1562,15 @@ nada; ×2 durante ACTIVE; fin por rock = 0; fin de canción; saturación del roc
 
 ```c
 struct GameCtx {
-    FsmState  st, prev_st;
-    GameState gs;
+    FsmState  st, prev_state;
+    Game_status gs;
     Song      song;
     Note      pool[MAX_NOTES];
     Record    rec[MAX_RECORDS]; u8 n_rec;
     DebCfg    cfg;  Debouncer deb;  UartCfg ucfg;
     Buzzer_t  bz;   SdCtx sd;
     u8  cursor;                 /* opción resaltada en menús                     */
-    u8  song_sel;               /* canción elegida                               */
+    u8  select_song;               /* canción elegida                               */
     u8  result;                 /* GameResult                                    */
     u32 t_state;                /* clock_sys_ms() al entrar al estado            */
     u8  name[3], name_pos, name_entry;   /* ingreso de iniciales al top 5        */
@@ -1580,7 +1580,7 @@ struct GameCtx {
 };
 ```
 
-Cada transición usa `enter_state(ctx, nuevo)`: guarda `prev_st`, pone `t_state =
+Cada transición usa `enter_state(ctx, nuevo)`: guarda `prev_state`, pone `t_state =
 clock_sys_ms()` y `redraw = 1`, y ejecuta la acción de entrada. **Al entrar a `ST_PLAY`:**
 `input_set_play_mode(1)` e `input_flush()`. **Al salir:** `input_set_play_mode(0)`.
 
@@ -1616,7 +1616,7 @@ cancelación); que `input_set_play_mode` se llame al entrar y salir de PLAY.
 | PAUSA | joystick ↕, S1, S2 |
 | GAME OVER | S1, micrófono (encore) |
 
-`fsm_step(ctx, ev)` recibe **un** evento de UI por frame (`ui_pop()` en `main`). `UI_SHAKE` solo
+`fsm_step(ctx, ev)` recibe **un** evento de UI por frame (`ui_pop()` en `main`). `UI_POWER_UP_ENABLE` solo
 importa en `ST_PLAY`. Las flechas del juego no pasan por la cola de UI: tienen la suya, con sello
 de tiempo.
 
@@ -1713,8 +1713,8 @@ int main(void)
     fsm_start(&ctx);                    /* ST_INIT -> logo */
     while (1) {
         theme_task();                   /* I2C del OPT3001, si hubo OPT_INT */
-        if (g_frame_flag) {             /* cada 30 ms (timer1) */
-            g_frame_flag = 0;
+        if (frame_flag) {             /* cada 30 ms (timer1) */
+            frame_flag = 0;
             fsm_step(&ctx, ui_pop());
             render_frame(&ctx);
         }
@@ -1863,7 +1863,7 @@ arranque. Guardar en `sd_card/` los archivos que van a la tarjeta.
 
 `make -C tests run` compila los módulos portables con `stubs.c` y los `test_*.c`. Los stubs
 deben cubrir `clock_*`, `buzzer_tone`, `sd_*`, `debouncer_init`, `input_*`, `sensors_*`,
-`theme_current`, `uart_hal_*`, `lcd_fill`, `lcd_blit` y los `GUI_*`. Hay un archivo de tests por
+`light_mode_current`, `uart_hal_*`, `lcd_fill`, `lcd_blit` y los `GUI_*`. Hay un archivo de tests por
 módulo: `test_engine.c`, `test_fsm.c`, `test_joy.c`, `test_formats.c`, `test_audio_seq.c`,
 `test_debcfg.c` y `test_uart_cfg.c`, con los casos de §9.1, §9.2 y §10.3. Si falla un caso, el
 ejecutable retorna ≠ 0.
@@ -1920,7 +1920,7 @@ PR.
 | **E5** Boot QSPI (AC4) | §11.1 con el programa de E4 | Arranca solo tras apagar y encender |
 | **E6** VIO/ILA (AC5) | §6 | Capturas de los 3 experimentos de §6.2 |
 | **E7** Audio (AC6) | TTC0 + EMIO, `sound_manager.c`, jingles, `make_chart.py`, `shc2c.py` | La canción suena desde el chart embebido, sin bloquear el bucle |
-| **E8** Sensores (AO1) | `accelerometer_aconditioner.c` | UI_SHAKE confiable por UART; nivel de público reacciona a la voz |
+| **E8** Sensores (AO1) | `accelerometer_aconditioner.c` | UI_POWER_UP_ENABLE confiable por UART; nivel de público reacciona a la voz |
 | **E9** Luz + tema (AO1, AO2) | OPT_INT (§15.1), `light_aconditioner.c`, `theme.c` | Tapar el sensor ⇒ tema oscuro; destapar ⇒ claro; log de registros escritos/leídos |
 | **E10** Juego | `game_engine`, `game_fsm`, `render` (sprites de flecha), `lcd_fast`, `gen_arrows.py`, tests y simulador | Partida completa jugable con el joystick; pantalla coherente con la página 4; render < 25 ms por frame; tests en verde |
 | **E11** UART config (AO3) | `uart_config.c` + HAL | Cambiar DEB_MS/BTN_MASK/JOY_UMBRAL/UMBRAL_SHAKE desde la consola y verificarlo (VIO/ILA para el IP) |
@@ -1939,7 +1939,7 @@ Orden crítico: E1 → E2 → E3 (el control del juego) → E4 (AO3). E5 se pued
 | **AO2** | ≥ 2 interrupciones de timers de Vivado + 1 interrupción del sensor de luz o temperatura | `axi_timer_0` (1 ms: reloj y buzzer), `axi_timer_1` (2 ms: joystick; acelerómetro y mic cada 10 ms; frames), INT del OPT3001 → `axi_gpio_1` → GIC 64 | Mostrar `isr_init` y el BD; el tema cambia por interrupción (log `[OPT]`) |
 | **AO3** | IP propio que interactúa con un periférico y con el procesador; init con punteros; parámetros desde la consola UART | `Debouncer_IP` (S1, S2, JOY_SEL; AXI4-Lite; irq); `debouncer_init(Debouncer *dev, const DebCfg *cfg)`; `uart_config.c` (DEB_MS, BTN_MASK) | Configurar DEB_MS/BTN_MASK por consola y comprobarlo en los menús y en el ILA |
 | **AC1** | Máquina de estados | `state_machine.c` (8 estados + sub-FSM del star power) | Recorrer todos los estados en el video; tests de la FSM |
-| **AC2** | Estructuras, arreglos, punteros, funciones y macros | `Lane` (enum), `Note`, `Song`, `GameState`, `GameCtx`, `Buzzer_t`, `Debouncer`, `DebCfg`, `Record[5]`, `chart[]`, colas circulares, sprites `arrow_spr[4][18*18]`, bitset `judged[]`, macros `HIT_WIN_MS`, `JOY_UMBRAL`, `STAR_*`, `DEB_*` | Revisión del código (rúbrica: uso correcto de punteros) |
+| **AC2** | Estructuras, arreglos, punteros, funciones y macros | `Lane` (enum), `Note`, `Song`, `Game_status`, `GameCtx`, `Buzzer_t`, `Debouncer`, `DebCfg`, `Record[5]`, `chart[]`, colas circulares, sprites `arrow_spr[4][18*18]`, bitset `judged[]`, macros `HIT_WIN_MS`, `JOY_UMBRAL`, `STAR_*`, `DEB_*` | Revisión del código (rúbrica: uso correcto de punteros) |
 | **AC3** | 2 periféricos adicionales distintos de los de AO1 | **Joystick** (las 4 flechas del juego y los menús) y **botones de la Booster** (S1/S2/JOY_SEL, filtrados por el IP propio) | Jugar y navegar los menús |
 | **AC4** | Boot sin subir el código cada vez | `BOOT.bin` en la QSPI (hoy) o en la SD (diagramas) | Apagar, encender y ver el juego arrancar solo |
 | **AC5** | VIO e ILA para validar transacciones; diferencias | `vio_0`, `ila_0` sobre `Debouncer_IP` | Los 3 experimentos de §6.2 y la tabla de §6.3 |

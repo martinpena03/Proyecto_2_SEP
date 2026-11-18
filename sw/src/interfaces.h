@@ -4,7 +4,7 @@
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero.
  * Fuente: diseño propio (docs/MANUAL_IMPLEMENTACION.md §7.4).
  *
- * VERSION AVANCE (sin pantalla, joystick, micrófono ni microSD).
+ * VERSION AVANCE (sin micrófono ni microSD; el LCD solo muestra la flecha del Demo).
  *
  * Regla de portabilidad: game_manager.c, state_machine.c,
  * sound_manager.c, sd_manager_formats.c, debouncer_ip_logic.c y uart_config.c solo usan funciones
@@ -89,9 +89,23 @@ void clock_song_run(int run);
 /* ====================================================================== */
 /* Entradas: botones de la Booster vía debouncer_axi (event_queues.c, no portable) */
 /* ====================================================================== */
+/* joystick_aconditioner_logic.c: detector de dirección con eje dominante e histéresis. */
+typedef enum { JS_CENTER = 0, JS_HELD = 1, JS_SETTLE = 2 } JoyPhase;
+typedef struct {
+    JoyPhase ph;        /* centro o dirección mantenida            */
+    Lane     dir;       /* última dirección detectada              */
+    u16      umbral;    /* desviación mínima para "dirección"      */
+    s16      x0, y0;    /* centro calibrado                        */
+    u8       inv_y;     /* 1 = invertir el signo del eje Y         */
+    u8       settle;    /* muestras que faltan para decidir        */
+} JoyDet;
+void joy_det_init(JoyDet *d, u16 x0, u16 y0, u16 umbral, u8 inv_y);
+int  joy_detect(JoyDet *d, u16 x, u16 y);   /* Lane recién activada o -1 */
+
+/* joystick_aconditioner.c */
+void    input_set_play_mode(int play);    /* 1 = JUEGO (flechas -> Hit_signal); 0 = menús */
 /* event_queues.c */
-void    input_set_play_mode(int play);    /* 1 = JUEGO (flechas -> Hit); 0 = menús */
-int     hit_pop(Hit *out);                /* 0 = cola vacía */
+int     hit_pop(Hit_signal *out);                /* 0 = cola vacía */
 UiEvent ui_pop(void);
 void    input_flush(void);                /* vacía ambas colas */
 
@@ -99,13 +113,13 @@ void    input_flush(void);                /* vacía ambas colas */
 /* Sensores: acelerómetro y micrófono (accelerometer_aconditioner.c, no portable)            */
 /* ====================================================================== */
 void sensors_set_shake_threshold(u16 mg);
-u8   sensors_crowd_level(void);           /* sin micrófono en el avance: 0 */
+u8   sensors_crowd_noise(void);           /* sin micrófono en el avance: 0 */
 
 /* ====================================================================== */
 /* Sensor de luz y tema (light_aconditioner.c, theme.c; no portables)                */
 /* ====================================================================== */
 typedef struct { u16 lo_lux, hi_lux; } Opt3001Cfg;
-Theme theme_current(void);                /* actualizado por la interrupción del OPT3001 */
+Theme light_mode_current(void);                /* actualizado por la interrupción del OPT3001 */
 
 /* ====================================================================== */
 /* Audio: ttc0_pwm.c = PWM (no portable), sound_manager.c = secuenciador (portable) */
@@ -126,7 +140,7 @@ typedef struct {
     u32 sfx_t;
 } Buzzer_t;
 
-void buzzer_tone(Buzzer_t *bz, u16 f_hz, u8 vol);                    /* ttc0_pwm.c (TTC0) */
+void buzzer_tone(Buzzer_t *bz, u16 freq, u8 duty);                   /* ttc0_pwm.c (TTC0) */
 void buzzer_init(Buzzer_t *bz, u8 vol);                              /* sound_manager.c    */
 void buzzer_play(Buzzer_t *bz, const Song *song);                    /* canción        */
 void buzzer_play_jingle(Buzzer_t *bz, const Note *notes, u16 n, u8 loop);
@@ -147,7 +161,7 @@ extern const Note SFX_ENCORE[];   extern const u16 SFX_ENCORE_N;
 /* ====================================================================== */
 /* SD: sd_manager.c = FatFs (no portable), sd_manager_formats.c = formatos (portable) */
 /* ====================================================================== */
-#define N_SONGS 2u                         /* SONG1.SHC y SONG2.SHC */
+#define N_SONGS 3u                         /* DEMO.SHC (primero), SONG1.SHC y SONG2.SHC */
 typedef struct { u8 mounted; } SdCtx;
 int  sd_init(SdCtx *sd);                                             /* intenta montar */
 int  sd_load_song(SdCtx *sd, Song *song, Note *pool, u8 song_idx);   /* n notas o < 0  */
@@ -160,18 +174,20 @@ u32  records_format(const Record *r, u8 n, char *buf, u32 max);
 int  records_insert(Record *r, u8 *n, const char *name, u32 score);  /* posición o -1 */
 
 /* sd_manager_songs.c (generado por tools/shc2c.py): respaldo sin microSD. */
+extern const char  g_demo_shc[];   extern const u32 g_demo_shc_len;
 extern const char  g_song1_shc[];  extern const u32 g_song1_shc_len;
 extern const char  g_song2_shc[];  extern const u32 g_song2_shc_len;
 
 /* ====================================================================== */
 /* Lógica del juego (game_manager.c, portable; AC2)                        */
 /* ====================================================================== */
-void game_reset(GameState *gs);
-int  game_judge_hit(GameState *gs, const Song *song, const Hit *hit);  /* 1 = acierto */
-void game_update(GameState *gs, const Song *song, u32 song_ms);
-int  game_try_star_power(GameState *gs);                               /* 1 = activado */
-int  game_is_over(const GameState *gs, const Song *song, u32 song_ms); /* GameResult   */
+void game_reset(Game_status *gs);
+int  game_judge_hit(Game_status *gs, const Song *song, const Hit_signal *hit);  /* 1 = acierto */
+void game_update(Game_status *gs, const Song *song, u32 song_ms);
+int  game_try_star_power(Game_status *gs);                               /* 1 = activado */
+int  game_is_over(const Game_status *gs, const Song *song, u32 song_ms); /* GameResult   */
 u32  song_duration_ms(const Song *song);
+const char *lane_name(u8 lane);           /* "LEFT", "UP", "DOWN", "RIGHT" */
 
 /* ====================================================================== */
 /* Máquina de estados (state_machine.c, portable; AC1)                         */
@@ -184,5 +200,16 @@ typedef enum {
 typedef struct GameCtx GameCtx;   /* definido en state_machine.h */
 void fsm_start(GameCtx *ctx);
 void fsm_step(GameCtx *ctx, UiEvent ev);
+
+/* ====================================================================== */
+/* Pantalla (Screen Manager): screen_manager.c y screen_manager_text.c portables,  */
+/* screen_manager_lcd.c no portable. En el avance solo muestra la flecha del Demo. */
+/* ====================================================================== */
+void render_frame(const GameCtx *ctx);
+
+#define LCD_W 128u
+#define LCD_H 128u
+void lcd_fill(u16 x0, u16 y0, u16 x1, u16 y1, u16 color);    /* x1, y1 exclusivos    */
+void lcd_blit(u16 x, u16 y, u16 w, u16 h, const u16 *pix);   /* RGB565, fila a fila  */
 
 #endif /* INTERFACES_H */

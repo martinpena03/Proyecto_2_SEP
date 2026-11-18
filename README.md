@@ -6,7 +6,8 @@ la PL (Vivado 2020.1).
 
 - **Reparto de trabajo, hitos y flujo de GitHub:** [`docs/PLAN_TRABAJO.md`](docs/PLAN_TRABAJO.md)
 - **Versión de avance (esta rama):** [`docs/AVANCE.md`](docs/AVANCE.md)
-- **Diagrama de bloques:** [`docs/diagramas/Diagrama_de_bloques_02_01.pdf`](docs/diagramas/Diagrama_de_bloques_02_01.pdf); los nombres de bloques, señales y archivos lo siguen ([`docs/NOMBRES_DIAGRAMA.md`](docs/NOMBRES_DIAGRAMA.md))
+- **Diagrama de bloques:** [`docs/diagramas/Diagrama_de_bloques_02.drawio`](docs/diagramas/Diagrama_de_bloques_02.drawio) (PDF anterior: [`Diagrama_de_bloques_02_01.pdf`](docs/diagramas/Diagrama_de_bloques_02_01.pdf)); los nombres de bloques, señales y archivos lo siguen ([`docs/NOMBRES_DIAGRAMA.md`](docs/NOMBRES_DIAGRAMA.md))
+- **Guía para trabajar con una IA:** [`CLAUDE.md`](CLAUDE.md) (funcionalidades, contenido de cada archivo, reglas y comandos)
 - **Enunciado y rúbricas:** repositorio del curso [IEE2463-SEP/PROY02](https://github.com/IEE2463-SEP/PROY02)
 
 ## Estructura

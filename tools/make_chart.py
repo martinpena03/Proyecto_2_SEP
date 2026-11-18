@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-make_chart.py - Genera los charts de Sep Hero (sd_card/SONG1.SHC y SONG2.SHC) a partir
-de melodías escritas como listas (nota, duración en tiempos).
+make_chart.py - Genera los charts de Sep Hero (sd_card/DEMO.SHC, SONG1.SHC y SONG2.SHC).
+Las canciones salen de melodías escritas como listas (nota, duración en tiempos); el
+nivel DEMO es una secuencia fija de flechas.
 
 Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
 (docs/MANUAL_IMPLEMENTACION.md §12.3). Melodías de dominio público:
   SONG1: "Oda a la Alegría" (L. van Beethoven, 9.a sinfonía, 1824).
   SONG2: "Korobeiniki" (canción tradicional rusa, s. XIX).
+
+Nivel DEMO (primero en la selección): DEMO_LANES flechas, una cada DEMO_STEP_MS, para
+mostrar en la presentación que se detecta cada flecha en su ventana (hitbox). Cada
+carril tiene un tono fijo, así el beep también indica la flecha.
 
 Para cada nota:
     t_ms  = leadin + (tiempos acumulados) * 60000 / BPM
@@ -24,7 +29,7 @@ Reglas de jugabilidad (hay que volver al centro entre dos golpes del mismo carri
 
 Formato del archivo: ver sw/src/sd_manager_formats.c.
 
-Uso:  python tools/make_chart.py          (escribe sd_card/SONG1.SHC y sd_card/SONG2.SHC)
+Uso:  python tools/make_chart.py          (escribe sd_card/DEMO.SHC, SONG1.SHC y SONG2.SHC)
 """
 import os
 
@@ -90,6 +95,14 @@ SONGS = [
     ("SONG2.SHC", "Korobeiniki",      140, 12, KOROBEINIKI),
 ]
 
+# Nivel DEMO: 10 flechas, 1 s entre cada una.
+DEMO_FILE    = "DEMO.SHC"
+DEMO_NAME    = "Demo"
+DEMO_STEP_MS = 1000
+DEMO_DUR_MS  = 300
+DEMO_LANES   = [ARRIBA, ABAJO, ABAJO, IZQ, DER, ARRIBA, IZQ, ABAJO, DER, ARRIBA]
+DEMO_FREQ    = {IZQ: 784, ARRIBA: 1047, ABAJO: 880, DER: 1319}     # G5, C6, A5, E6
+
 
 def assign_lanes(notes):
     """notes: lista de (t_ms, midi). Devuelve la lista de carriles."""
@@ -118,6 +131,22 @@ def assign_lanes(notes):
     return lanes
 
 
+def chart_text(name, bpm, rows):
+    out = ["# SEP HERO chart v1",
+           "# Generado por tools/make_chart.py (no editar a mano; editar la melodia alla)",
+           "NAME=%s" % name[:15],
+           "BPM=%d" % bpm,
+           "# t_ms  lane(0=IZQ 1=ARRIBA 2=ABAJO 3=DER)  freq_hz  dur_ms"]
+    out += ["%d %d %d %d" % r for r in rows]
+    return "\n".join(out) + "\n"
+
+
+def build_demo(leadin=3000):
+    rows = [(leadin + k * DEMO_STEP_MS, lane, DEMO_FREQ[lane], DEMO_DUR_MS)
+            for k, lane in enumerate(DEMO_LANES)]
+    return chart_text(DEMO_NAME, 60000 // DEMO_STEP_MS, rows), rows
+
+
 def build(name, bpm, transpose, melody, leadin=3000):
     beat_ms = 60000.0 / bpm
     notes, rows = [], []
@@ -131,19 +160,14 @@ def build(name, bpm, transpose, melody, leadin=3000):
     lanes = assign_lanes([(t, m) for (t, m, _) in notes])
     for (t, m, d), lane in zip(notes, lanes):
         rows.append((t, lane, freq(m), d))
-    out = ["# SEP HERO chart v1",
-           "# Generado por tools/make_chart.py (no editar a mano; editar la melodia alla)",
-           "NAME=%s" % name[:15],
-           "BPM=%d" % bpm,
-           "# t_ms  lane(0=IZQ 1=ARRIBA 2=ABAJO 3=DER)  freq_hz  dur_ms"]
-    out += ["%d %d %d %d" % r for r in rows]
-    return "\n".join(out) + "\n", rows
+    return chart_text(name, bpm, rows), rows
 
 
 if __name__ == "__main__":
     os.makedirs(os.path.join(ROOT, "sd_card"), exist_ok=True)
-    for fname, name, bpm, tr, mel in SONGS:
-        text, rows = build(name, bpm, tr, mel)
+    charts = [(DEMO_FILE,) + build_demo()]
+    charts += [(fname,) + build(name, bpm, tr, mel) for fname, name, bpm, tr, mel in SONGS]
+    for fname, text, rows in charts:
         with open(os.path.join(ROOT, "sd_card", fname), "w", newline="\n") as f:
             f.write(text)
         hist = [sum(1 for r in rows if r[1] == k) for k in range(4)]

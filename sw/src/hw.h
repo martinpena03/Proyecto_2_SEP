@@ -4,8 +4,9 @@
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio.
  *
  * Complementa a interfaces.h con lo que NO necesita la lógica portable. En el avance la
- * placa usa solo: OPT3001 (I2C), acelerómetro (ADC SPI), Debouncer_IP (botones + LEDs),
- * buzzer (TTC0), 2 timers AXI y la UART. Sin pantalla, joystick, micrófono ni microSD.
+ * placa usa: OPT3001 y TMP006 (I2C), acelerómetro y joystick (ADC SPI), Debouncer_IP
+ * (botones + LEDs), buzzer (TTC0), 2 timers AXI, la UART y el LCD (solo para la flecha
+ * del nivel Demo). Sin micrófono ni microSD.
  */
 #ifndef HW_H
 #define HW_H
@@ -14,6 +15,9 @@
 
 #ifndef SEP_MUTE
 #define SEP_MUTE       0     /* 1 = el firmware arranca con el buzzer deshabilitado          */
+#endif
+#ifndef JOY_INVERT_Y
+#define JOY_INVERT_Y   0     /* 1 si con la palanca hacia arriba el ADC entrega valores bajos */
 #endif
 #ifndef MUSIC_START_MUTED
 #define MUSIC_START_MUTED 1  /* 1 = la música del juego parte en silencio; JOY_SEL la enciende/apaga */
@@ -29,7 +33,7 @@
 
 /* ---- isr_handler.c: GIC, timers AXI y relojes -------------------------------------- */
 int  isr_init(GameCtx *ctx);              /* 0 = OK. Deja las interrupciones habilitadas */
-extern volatile u8  g_frame_flag;         /* 1 cada 30 ms; lo consume main               */
+extern volatile u8  frame_flag;         /* 1 cada 30 ms; lo consume main               */
 extern volatile u8  g_opt_poll;           /* 1 cada 200 ms: revisar el OPT3001 (AO2)     */
 extern volatile u32 g_irq_cnt[4];         /* cuentas: timer0, timer1, debouncer, gpio    */
 extern volatile u32 g_t1_max_us;          /* duración máxima de timer1_cb [us]           */
@@ -39,7 +43,7 @@ void deb_isr(void *ref);                  /* interrupción del IP propio        
 int  gpio1_init(void);                    /* axi_gpio_1 (SENS_INT) con interrupción      */
 void gpio_isr(void *ref);                 /* interrupción de axi_gpio_1 (DRDY del TMP006) */
 u32  gpio1_read(void);                    /* nivel actual de las entradas de axi_gpio_1  */
-extern volatile u8  tmp_pending;          /* 1 = el TMP006 terminó una conversión (DRDY) */
+extern volatile u8  tmp_drdy;          /* 1 = el TMP006 terminó una conversión (DRDY) */
 extern volatile u32 g_tmp_irq;            /* interrupciones de DRDY atendidas por la ISR */
 extern u8 g_tmp_bit;                      /* bit de axi_gpio_1 conectado al DRDY         */
 extern volatile u8  g_mute_req;           /* pulsaciones de JOY_SEL (música ON / OFF)    */
@@ -48,7 +52,15 @@ extern volatile u8  g_btn_cnt[3];         /* pulsaciones vistas por la ISR: S1, 
 /* ---- event_queues.c: colas ISR -> main ------------------------------------------- */
 void ui_push(UiEvent ev);                 /* encola un evento de interfaz                */
 void hit_push(u8 lane, u32 song_ms);      /* encola un golpe (autoplay de la consola)    */
+void hit_push_joy(u8 lane, u32 song_ms);  /* encola un golpe del joystick                */
+
+/* ---- joystick_aconditioner.c: joystick por el ADC (Joystick_aconditioner) --------- */
+int  input_init(void);                    /* calibra el centro del joystick; 0 = OK      */
+void joy_sample(void);                    /* desde timer1 (2 ms)                         */
 void input_mute_hits_until(u32 sys_ms);   /* descarta golpes hasta ese instante          */
+
+/* ---- screen_manager_lcd.c: envío rápido al LCD ----------------------------------- */
+void lcd_fast_init(void);                 /* toma los offsets del driver del curso       */
 
 /* ---- temperature_aconditioner.c: TMP006 (interrupción del pin DRDY, AO2) ----------------- */
 int  tmp006_init(void);                   /* ID + CONFIG con DRDY habilitado; 0 = OK     */
@@ -56,7 +68,7 @@ u8   tmp006_detect_drdy(u8 skip_bit);     /* bit de axi_gpio_1 con el DRDY o SEN
 const char *sens_cand_name(u8 bit);       /* "JA3 (K16)" etc.                            */
 s32  tmp006_read_cc(void);                /* temperatura en centésimas de °C (libera DRDY) */
 s32  tmp006_last_cc(void);                /* última lectura, sin usar el I2C             */
-void temp_task(void);                     /* desde main: atiende tmp_pending por I2C     */
+void temp_task(void);                     /* desde main: atiende tmp_drdy por I2C     */
 
 /* ---- accelerometer_aconditioner.c: acelerómetro ----------------------------------------------- */
 int  sensors_acc_init(void);                /* calibra en reposo; 0 = OK                   */

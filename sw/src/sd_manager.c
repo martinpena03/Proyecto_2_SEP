@@ -5,7 +5,7 @@
  *   sd_manager.c del proyecto completo (rama proyecto-final), que usa la microSD.
  *
  * Implementa la interfaz sd_* de interfaces.h con los charts embebidos (sd_manager_songs.c,
- * generados por tools/shc2c.py) y los récords solo en RAM.
+ * generados por tools/shc2c.py: nivel Demo, SONG1 y SONG2) y los récords solo en RAM.
  */
 #include "xil_printf.h"
 #include "interfaces.h"
@@ -24,8 +24,9 @@ int sd_load_song(SdCtx *sd, Song *song, Note *pool, u8 song_idx)
 {
     int n;
     (void)sd;
-    if (song_idx == 0u) n = song_parse(g_song1_shc, g_song1_shc_len, song, pool, MAX_NOTES);
-    else                n = song_parse(g_song2_shc, g_song2_shc_len, song, pool, MAX_NOTES);
+    if (song_idx == LEVEL_DEMO) n = song_parse(g_demo_shc,  g_demo_shc_len,  song, pool, MAX_NOTES);
+    else if (song_idx == 1u)    n = song_parse(g_song1_shc, g_song1_shc_len, song, pool, MAX_NOTES);
+    else                        n = song_parse(g_song2_shc, g_song2_shc_len, song, pool, MAX_NOTES);
     xil_printf("[SONG] cancion %d embebida: %d notas\r\n", song_idx + 1, n);
     return n;
 }

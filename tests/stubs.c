@@ -6,8 +6,8 @@
  *
  * Permiten compilar y probar la lógica portable (game_manager, state_machine, screen_manager,
  * sound_manager, uart_config, ...) sin la Zybo. Cada stub guarda lo que recibió en variables
- * globales que los tests inspeccionan (ver stubs.h). lcd_fill / lcd_blit están en
- * sim/fb.c (framebuffer).
+ * globales que los tests inspeccionan (ver stubs.h). lcd_fill / lcd_blit escriben en
+ * un framebuffer en memoria (stub_lcd_fb).
  */
 #include <string.h>
 #include "stubs.h"
@@ -28,7 +28,7 @@ int   stub_sd_saves;
 char  stub_sd_records[256];
 char  stub_uart_out[16384];
 
-static Hit  hitq[64];
+static Hit_signal  hitq[64];
 static int  hq_head, hq_tail;
 static char uart_in[512];
 static int  ui_len, ui_pos;
@@ -60,13 +60,43 @@ void stub_advance(u32 ms)
     if (stub_song_running) stub_song_ms += ms;
 }
 
-void stub_push_hit(u8 lane, u32 song_ms)
+static void push_hit(u8 lane, u32 song_ms, u8 from_joy)
 {
     if (hq_head < (int)(sizeof hitq / sizeof hitq[0])) {
         hitq[hq_head].lane = lane;
-        hitq[hq_head].song_ms = song_ms;
+        hitq[hq_head].from_joy = from_joy;
+        hitq[hq_head].t_ms = song_ms;
         hq_head++;
     }
+}
+void stub_push_hit(u8 lane, u32 song_ms)     { push_hit(lane, song_ms, 0u); }   /* autoplay */
+void stub_push_joy_hit(u8 lane, u32 song_ms) { push_hit(lane, song_ms, 1u); }   /* joystick */
+
+/* ----------------------------- LCD (screen_manager_lcd.c) ------------------ */
+u16 stub_lcd_fb[LCD_H][LCD_W];
+u32 stub_lcd_px;                               /* píxeles enviados al "LCD" */
+void lcd_fill(u16 x0, u16 y0, u16 x1, u16 y1, u16 color)
+{
+    u16 x, y;
+    for (y = y0; y < y1 && y < LCD_H; y++)
+        for (x = x0; x < x1 && x < LCD_W; x++) { stub_lcd_fb[y][x] = color; stub_lcd_px++; }
+}
+void lcd_blit(u16 x, u16 y, u16 w, u16 h, const u16 *pix)
+{
+    u16 i, j;
+    for (j = 0; j < h; j++)
+        for (i = 0; i < w; i++) {
+            if (y + j < LCD_H && x + i < LCD_W) stub_lcd_fb[y + j][x + i] = pix[j * w + i];
+            stub_lcd_px++;
+        }
+}
+u32 stub_lcd_count(u16 color)
+{
+    u32 n = 0;
+    u16 x, y;
+    for (y = 0; y < LCD_H; y++)
+        for (x = 0; x < LCD_W; x++) n += (stub_lcd_fb[y][x] == color);
+    return n;
 }
 
 void stub_uart_feed(const char *s)
@@ -89,7 +119,7 @@ void clock_song_run(int run)   { stub_song_running = (run != 0); }
 void input_set_play_mode(int play)      { stub_play_mode = play; }
 void input_flush(void)                  { hq_head = hq_tail = 0; stub_flush_count++; }
 UiEvent ui_pop(void)                    { return UI_NONE; }
-int hit_pop(Hit *out)
+int hit_pop(Hit_signal *out)
 {
     if (hq_tail == hq_head) return 0;
     *out = hitq[hq_tail++];
@@ -99,15 +129,15 @@ int hit_pop(Hit *out)
 
 /* ----------------------------- sensores y tema ----------------------------- */
 void  sensors_set_shake_threshold(u16 mg) { stub_shake_mg = mg; }
-u8    sensors_crowd_level(void)           { return stub_crowd; }
-Theme theme_current(void)                 { return stub_theme; }
+u8    sensors_crowd_noise(void)           { return stub_crowd; }
+Theme light_mode_current(void)                 { return stub_theme; }
 
 /* ----------------------------- buzzer (ttc0_pwm.c) ---------------------------- */
-void buzzer_tone(Buzzer_t *bz, u16 f_hz, u8 vol)
+void buzzer_tone(Buzzer_t *bz, u16 freq, u8 duty)
 {
-    (void)vol;
-    if (bz) bz->cur_f = f_hz;
-    stub_tone_f = f_hz;
+    (void)duty;
+    if (bz) bz->cur_f = freq;
+    stub_tone_f = freq;
     stub_tone_calls++;
 }
 
@@ -157,8 +187,9 @@ int sd_init(SdCtx *sd)
 int sd_load_song(SdCtx *sd, Song *song, Note *pool, u8 song_idx)
 {
     (void)sd;
-    if (song_idx == 0u) return song_parse(g_song1_shc, g_song1_shc_len, song, pool, MAX_NOTES);
-    if (song_idx == 1u) return song_parse(g_song2_shc, g_song2_shc_len, song, pool, MAX_NOTES);
+    if (song_idx == 0u) return song_parse(g_demo_shc,  g_demo_shc_len,  song, pool, MAX_NOTES);
+    if (song_idx == 1u) return song_parse(g_song1_shc, g_song1_shc_len, song, pool, MAX_NOTES);
+    if (song_idx == 2u) return song_parse(g_song2_shc, g_song2_shc_len, song, pool, MAX_NOTES);
     return -1;
 }
 int sd_load_records(SdCtx *sd, Record *r, u8 max)

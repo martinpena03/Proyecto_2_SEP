@@ -14,6 +14,7 @@ int main(void)
         { "game_manager", test_engine },   { "sd_manager", test_formats },
         { "sound_manager", test_audio_seq },  { "debcfg", test_debcfg },
         { "uart_config", test_uart_cfg }, { "state_machine", test_fsm },
+        { "nivel_demo", test_demo },
     };
     unsigned i;
     for (i = 0; i < sizeof T / sizeof T[0]; i++) {

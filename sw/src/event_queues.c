@@ -3,9 +3,10 @@
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (docs/MANUAL_IMPLEMENTACION.md §8.3). No es un bloque del diagrama: es el transporte
- * de Btn_edges hacia State_Machine. En el avance no hay joystick: los eventos llegan de
- * los botones de la Booster (S1, S2, JOY_SEL) a través de Debouncer_IP (la ISR está en
- * isr_handler.c) o del teclado del PC (uart_console.c).
+ * de Btn_edges y Hit_signal hacia State_Machine. Los eventos de interfaz llegan de los
+ * botones de la Booster (S1, S2, JOY_SEL) a través de Debouncer_IP (la ISR está en
+ * isr_handler.c) o del teclado del PC (uart_console.c). Los golpes llegan del joystick
+ * (joystick_aconditioner.c) o del autoplay de la consola.
  *
  * Colas circulares SPSC (un productor = ISR, un consumidor = main), de tamaño potencia
  * de 2 e índices volatile: no hace falta deshabilitar interrupciones para consumirlas.
@@ -13,22 +14,26 @@
 #include "hw.h"
 
 /* ------------------------------- colas ------------------------------------ */
-typedef struct { Hit buf[HIT_Q_LEN]; volatile u8 head, tail; } HitQ;      /* head: productor */
+typedef struct { Hit_signal buf[HIT_Q_LEN]; volatile u8 head, tail; } HitQ;      /* head: productor */
 typedef struct { u8 buf[UI_Q_LEN];   volatile u8 head, tail; } UiQ;
 static HitQ hq;
 static UiQ  uq;
 
-void hit_push(u8 lane, u32 song_ms)
+static void hit_push_src(u8 lane, u32 song_ms, u8 from_joy)
 {
     u8 nh = (u8)((hq.head + 1u) & (HIT_Q_LEN - 1u));
     if (nh != hq.tail) {                          /* llena: el golpe se descarta */
         hq.buf[hq.head].lane = lane;
-        hq.buf[hq.head].song_ms = song_ms;
+        hq.buf[hq.head].from_joy = from_joy;
+        hq.buf[hq.head].t_ms = song_ms;
         hq.head = nh;
     }
 }
 
-int hit_pop(Hit *out)
+void hit_push(u8 lane, u32 song_ms)     { hit_push_src(lane, song_ms, 0u); }   /* autoplay */
+void hit_push_joy(u8 lane, u32 song_ms) { hit_push_src(lane, song_ms, 1u); }   /* joystick */
+
+int hit_pop(Hit_signal *out)
 {
     if (hq.tail == hq.head) return 0;
     *out = hq.buf[hq.tail];
@@ -59,8 +64,3 @@ void input_flush(void)
     hq.tail = hq.head;
     uq.tail = uq.head;
 }
-
-/* Sin joystick no hay modo juego que cambiar ni golpes que silenciar tras una sacudida;
- * se conservan por la interfaz de la máquina de estados (portable). */
-void input_set_play_mode(int play)      { (void)play; }
-void input_mute_hits_until(u32 sys_ms)  { (void)sys_ms; }

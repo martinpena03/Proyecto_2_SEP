@@ -46,16 +46,16 @@ static void help(void)
 static void dump_status(GameCtx *ctx)
 {
     xil_printf("[ST] %s cursor=%d cancion=%d | song_ms=%d score=%d hits=%d miss=%d rock=%d | auto=%d tema=%s\r\n",
-               st_name(ctx->st), ctx->cursor, ctx->song_sel, (int)clock_song_ms(), (int)ctx->gs.score,
-               ctx->gs.hits, ctx->gs.misses, ctx->gs.rock, g_auto,
-               (ctx->gs.theme == THEME_LIGHT) ? "CLARO" : "OSCURO");
+               st_name(ctx->state), ctx->cursor, ctx->select_song, (int)clock_song_ms(), (int)ctx->game_status.score,
+               ctx->game_status.hits, ctx->game_status.misses, ctx->game_status.rock, g_auto,
+               (ctx->game_status.light_mode == THEME_LIGHT) ? "CLARO" : "OSCURO");
 }
 
 static void dump_opt(void)
 {
     xil_printf("[OPT] RESULT=0x%04x CONFIG=0x%04x LOW=0x%04x HIGH=0x%04x | lux=%d tema=%s cambios=%d\r\n",
                opt_read_reg(0x00), opt_read_reg(0x01), opt_read_reg(0x02), opt_read_reg(0x03),
-               opt3001_read_lux(), (theme_current() == THEME_LIGHT) ? "CLARO" : "OSCURO",
+               opt3001_read_lux(), (light_mode_current() == THEME_LIGHT) ? "CLARO" : "OSCURO",
                (int)g_theme_changes);
 }
 
@@ -99,7 +99,7 @@ static void dump_ttc(GameCtx *ctx)
 void console_poll(GameCtx *ctx)
 {
     int c;
-    if (ctx->st == ST_CONFIG) return;             /* la consola la usa uart_config */
+    if (ctx->state == ST_CONFIG) return;             /* la consola la usa uart_config */
     c = uart_hal_getc();
     if (c < 0) return;
     switch (c) {
@@ -108,7 +108,7 @@ void console_poll(GameCtx *ctx)
     case '2': g_inj = UI_BACK; break;
     case 'u': g_inj = UI_UP; break;
     case 'j': g_inj = UI_DOWN; break;
-    case 'k': g_inj = UI_SHAKE; break;
+    case 'k': g_inj = UI_POWER_UP_ENABLE; break;
     case 'p': g_auto = (u8)!g_auto; xil_printf("[AUTO] %d\r\n", g_auto); break;
     case 's': dump_status(ctx); break;
     case 'o': dump_opt(); break;
@@ -123,16 +123,16 @@ void console_poll(GameCtx *ctx)
  * de cada nota en su instante exacto (no hay joystick en el avance). */
 void console_frame(GameCtx *ctx)
 {
-    if (ctx->st != g_last_st) {
-        if (ctx->st == ST_PLAY && clock_song_ms() < 200u) g_auto_next = 0;
-        if (ctx->st == ST_GAMEOVER) {
+    if (ctx->state != g_last_st) {
+        if (ctx->state == ST_PLAY && clock_song_ms() < 200u) g_auto_next = 0;
+        if (ctx->state == ST_GAMEOVER) {
             xil_printf("[GAME] fin: %s score=%d hits=%d miss=%d racha_max=%d rock=%d\r\n",
-                       (ctx->result == RESULT_WIN) ? "VICTORIA" : "DERROTA", (int)ctx->gs.score,
-                       ctx->gs.hits, ctx->gs.misses, ctx->gs.max_streak, ctx->gs.rock);
+                       (ctx->result == RESULT_WIN) ? "VICTORIA" : "DERROTA", (int)ctx->game_status.score,
+                       ctx->game_status.hits, ctx->game_status.misses, ctx->game_status.max_streak, ctx->game_status.rock);
         }
-        g_last_st = ctx->st;
+        g_last_st = ctx->state;
     }
-    if (g_auto && ctx->st == ST_PLAY) {
+    if (g_auto && ctx->state == ST_PLAY) {
         u32 now = clock_song_ms();
         while (g_auto_next < ctx->song.n && ctx->song.chart[g_auto_next].t_ms <= now + 20u) {
             hit_push((u8)ctx->song.chart[g_auto_next].lane, ctx->song.chart[g_auto_next].t_ms);

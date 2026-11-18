@@ -56,19 +56,19 @@ int audio_is_muted(void) { return g_mute; }
  * con SEP_MUTE = 1 el botón no puede habilitar el sonido. El secuenciador sigue avanzando
  * en silencio, así al volver la música retoma en la nota que corresponde. Se llama desde
  * main, no desde la ISR. */
-static u8 g_user_mute = MUSIC_START_MUTED;   /* 1 = la música parte apagada */
+static u8 song_enabler = !MUSIC_START_MUTED; /* Song_enabler: 1 = música del juego encendida */
 
-int audio_user_muted(void) { return g_user_mute; }
+int audio_user_muted(void) { return !song_enabler; }
 
 void audio_user_mute_task(void)
 {
     static u8 seen;
     u8 req = g_mute_req;
     if (req == seen) return;
-    if ((u8)(req - seen) & 1u) g_user_mute = (u8)!g_user_mute;   /* pulsaciones impares */
+    if ((u8)(req - seen) & 1u) song_enabler = (u8)!song_enabler;   /* pulsaciones impares */
     seen = req;
-    if (!SEP_MUTE) audio_set_mute(g_user_mute);
-    xil_printf("[BUZ] JOY_SEL -> musica %s%s\r\n", g_user_mute ? "OFF (silencio)" : "ON",
+    if (!SEP_MUTE) audio_set_mute(!song_enabler);
+    xil_printf("[BUZ] JOY_SEL -> musica %s%s\r\n", song_enabler ? "ON" : "OFF (silencio)",
                SEP_MUTE ? " (build en mudo: el buzzer sigue deshabilitado)" : "");
 }
 
@@ -85,25 +85,26 @@ void audio_set_mute(int mute)
     if (!g_mute) XTtcPs_Start(&ttc);
 }
 
-/* Programa una nota: f_hz = frecuencia (0 = silencio), vol = 0..100 (duty 0..50 %). */
-void buzzer_tone(Buzzer_t *bz, u16 f_hz, u8 vol)
+/* Programa una nota (freq, duty del diagrama): freq = frecuencia en Hz (0 = silencio),
+ * duty = 0..100 (ciclo de trabajo real 0..50 %). */
+void buzzer_tone(Buzzer_t *bz, u16 freq, u8 duty)
 {
     XInterval interval;
     u8 presc;
 
-    if (bz != NULL) bz->cur_f = f_hz;
+    if (bz != NULL) bz->cur_f = freq;
     if (!g_ready) return;
-    if (f_hz == 0u || vol == 0u) {              /* silencio */
+    if (freq == 0u || duty == 0u) {              /* silencio */
         XTtcPs_SetMatchValue(&ttc, 0, 0xFFFFu);
         XTtcPs_SetInterval(&ttc, 0xFFFEu);
         return;
     }
     XTtcPs_Stop(&ttc);
-    XTtcPs_CalcIntervalFromFreq(&ttc, f_hz, &interval, &presc);
+    XTtcPs_CalcIntervalFromFreq(&ttc, freq, &interval, &presc);
     XTtcPs_SetInterval(&ttc, interval);
     XTtcPs_SetPrescaler(&ttc, presc);
     /* El volumen se regula con el duty: el máximo de la fundamental está en 50 %. */
-    XTtcPs_SetMatchValue(&ttc, 0, (XMatchRegValue)((u32)interval * vol / 200u));
+    XTtcPs_SetMatchValue(&ttc, 0, (XMatchRegValue)((u32)interval * duty / 200u));
     XTtcPs_ResetCounterValue(&ttc);
     if (!g_mute) XTtcPs_Start(&ttc);            /* en mudo el contador queda detenido */
 }

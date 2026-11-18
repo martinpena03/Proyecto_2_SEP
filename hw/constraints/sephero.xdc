@@ -7,6 +7,12 @@
 ## Los nombres de puerto coinciden con los de design_1_wrapper.
 ## =============================================================================
 
+## ---- LCD ST7735S (Pmod JE): axi_quad_spi_0 + axi_gpio_0 - igual que LAB10/AYU11
+set_property -dict { PACKAGE_PIN V12 IOSTANDARD LVCMOS33 } [get_ports { RS_tri_o[0] }];   # JE1  DC/RS
+set_property -dict { PACKAGE_PIN W16 IOSTANDARD LVCMOS33 } [get_ports { CS[0] }];         # JE2  CS
+set_property -dict { PACKAGE_PIN J15 IOSTANDARD LVCMOS33 } [get_ports { MOSI }];          # JE3  MOSI
+set_property -dict { PACKAGE_PIN H15 IOSTANDARD LVCMOS33 } [get_ports { RST_tri_o[0] }];  # JE4  RST
+set_property -dict { PACKAGE_PIN V13 IOSTANDARD LVCMOS33 } [get_ports { SCLK }];          # JE7  SCLK
 
 ## ---- ADC SPI de la tarjeta de extensión (Pmod JC): axi_quad_spi_1 - igual que LAB10
 set_property -dict { PACKAGE_PIN W14 IOSTANDARD LVCMOS33 } [get_ports { spi_rtl_io1_io }];    # JC7  MISO

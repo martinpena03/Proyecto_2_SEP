@@ -18,8 +18,8 @@
 #define PAUSE_ITEMS 3u      /* Continuar, Reiniciar, Salir                  */
 
 struct GameCtx {
-    FsmState  st, prev_st;          /* estado actual y anterior                       */
-    GameState gs;                   /* estado de la partida                           */
+    FsmState  state, prev_state;    /* State: estado actual y anterior                */
+    Game_status game_status;        /* Game_status: estado de la partida              */
     Song      song;                 /* canción cargada (song.chart apunta a pool)     */
     Note      pool[MAX_NOTES];      /* almacenamiento de las notas                    */
     Note      preview[PREVIEW_N];   /* primeras notas, con el tiempo relativo a 0     */
@@ -31,7 +31,7 @@ struct GameCtx {
     Buzzer_t  bz;                   /* secuenciador del buzzer                        */
     SdCtx     sd;                   /* estado de la microSD                           */
     u8   cursor;                    /* opción resaltada en los menús                  */
-    u8   song_sel;                  /* canción elegida (0..N_SONGS-1)                 */
+    u8   select_song;                  /* canción elegida (0..N_SONGS-1)                 */
     u8   song_ok;                   /* 1 = la canción elegida cargó bien              */
     u8   result;                    /* GameResult de la última partida                */
     u32  t_state;                   /* clock_sys_ms() al entrar al estado             */
@@ -46,7 +46,7 @@ struct GameCtx {
 };
 
 /* Accesores usados por las ISR (isr_handler.c), que no necesitan conocer el resto del contexto. */
-static inline GameState *ctx_gs(GameCtx *c) { return &c->gs; }
+static inline Game_status *ctx_game_status(GameCtx *c) { return &c->game_status; }
 static inline Buzzer_t  *ctx_bz(GameCtx *c) { return &c->bz; }
 
 /* Aplica una configuración: IP propio + umbrales de joystick y acelerómetro. */

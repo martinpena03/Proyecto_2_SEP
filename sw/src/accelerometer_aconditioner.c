@@ -1,7 +1,7 @@
 /*
  * accelerometer_aconditioner.c - Accelerometer_aconditioner: aX, aY, aZ del ADC ->
  * evento "movimiento" desde la interrupción de timer1 (AO2). VERSION AVANCE: sin
- * Microphone_aconditioner, por eso sensors_crowd_level() devuelve 0.
+ * Microphone_aconditioner, por eso sensors_crowd_noise() devuelve 0.
  *
  * Proyecto 2 IEE2463 (SEP). Autores: grupo Sep Hero. Fuente: diseño propio
  * (docs/MANUAL_IMPLEMENTACION.md §8.4); el ADC se lee con el driver del curso (lib/ADC.c).
@@ -19,6 +19,7 @@
 
 #define ACC_ZERO          512       /* cuentas a 0 g                                   */
 #define SHAKE_REFRACT_MS  500u
+#define SHAKE_MUTE_MS     300u      /* tras una sacudida se ignoran los golpes         */
 
 static u16 g_cpg = 200;             /* cuentas por g                                   */
 static u16 g_shake_mg = 800;
@@ -45,7 +46,7 @@ static u32 isqrt32(u32 v)
 void sensors_set_shake_threshold(u16 mg) { g_shake_mg = mg; }
 u32  sensors_motion_count(void)          { return g_motion_cnt; }
 u16  sensors_last_motion_mg(void)        { return g_motion_mg; }
-u8   sensors_crowd_level(void)           { return 0u; }
+u8   sensors_crowd_noise(void)           { return 0u; }
 
 void sensors_acc_debug(u16 *acc, u16 *cpg, u32 *shakes)
 {
@@ -103,6 +104,7 @@ void sensors_acc_sample(void)
         g_shake_last = now;
         g_motion_mg = (u16)((a_mg > 1000u) ? (a_mg - 1000u) : 0u);
         g_motion_cnt++;
-        ui_push(UI_SHAKE);
+        ui_push(UI_POWER_UP_ENABLE);
+        input_mute_hits_until(now + SHAKE_MUTE_MS);        /* la palanca se mueve al sacudir */
     }
 }

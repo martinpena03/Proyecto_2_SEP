@@ -21,20 +21,20 @@ static void make_song(u16 n)
     strcpy(song.name, "TEST");
     song.bpm = 60; song.n = n; song.chart = pool;
 }
-static Hit mk(u8 lane, u32 t) { Hit h; h.lane = lane; h.song_ms = t; return h; }
+static Hit_signal mk(u8 lane, u32 t) { Hit_signal h; h.lane = lane; h.t_ms = t; return h; }
 
 /* ------------------------------------------------------------ game_engine */
 void test_engine(void)
 {
-    GameState gs;
-    Hit h;
+    Game_status gs;
+    Hit_signal h;
     u16 i;
     memset(&gs, 0, sizeof gs);
     make_song(30);
 
-    gs.theme = THEME_LIGHT;
+    gs.light_mode = THEME_LIGHT;
     game_reset(&gs);
-    CHECK(gs.rock == ROCK_START && gs.score == 0 && gs.theme == THEME_LIGHT);
+    CHECK(gs.rock == ROCK_START && gs.score == 0 && gs.light_mode == THEME_LIGHT);
 
     /* Acierto justo en los bordes de la ventana (+-120 ms) y fallo fuera de ella. */
     h = mk(0, 3000 - HIT_WIN_MS);          CHECK(game_judge_hit(&gs, &song, &h) == 1);
@@ -59,14 +59,15 @@ void test_engine(void)
     game_update(&gs, &song, 6000 + HIT_WIN_MS + 1);
     CHECK(gs.misses == 1 && gs.streak == 0 && gs.rock == ROCK_START - 1 && gs.next_note == 4);
 
-    /* 10 aciertos seguidos => READY; el rock se satura en ROCK_MAX. */
+    /* STAR_STREAK aciertos seguidos => READY (el rock sube +1 por acierto, con tope). */
     game_reset(&gs);
     for (i = 0; i < STAR_STREAK; i++) {
         h = mk((u8)(i % 4u), 3000u + 1000u * i);
         CHECK(game_judge_hit(&gs, &song, &h) == 1);
     }
-    game_update(&gs, &song, 12050);
-    CHECK(gs.star_phase == STAR_READY && gs.star_bar == 100 && gs.rock == ROCK_MAX);
+    game_update(&gs, &song, 3000u + 1000u * (STAR_STREAK - 1u) + 50u);   /* justo tras el ultimo golpe */
+    CHECK(gs.star_phase == STAR_READY && gs.star_bar == 100);
+    CHECK(gs.rock == ((ROCK_START + (int)STAR_STREAK > ROCK_MAX) ? ROCK_MAX : ROCK_START + (int)STAR_STREAK));
     CHECK(gs.max_streak == STAR_STREAK);
 
     /* Sacudida: en READY activa; puntaje doble mientras está ACTIVE. */

@@ -20,4 +20,5 @@ void test_audio_seq(void);
 void test_debcfg(void);
 void test_uart_cfg(void);
 void test_fsm(void);
+void test_demo(void);
 #endif /* TEST_H */

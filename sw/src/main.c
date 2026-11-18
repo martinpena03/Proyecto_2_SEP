@@ -5,10 +5,12 @@
  * Fuente: diseño propio (docs/MANUAL_IMPLEMENTACION.md §9.6). El orden de inicialización
  *   de ADC / I2C sigue el main.c del Proyecto_Base_Booster (LAB10).
  *
- * El avance no dibuja nada: todo se muestra por la UART y con los LEDs LD0..LD3.
+ * Todo se muestra por la UART y con los LEDs LD0..LD3. El LCD solo muestra la flecha que
+ * hay que tocar en el nivel Demo (screen_manager.c); el joystick genera los golpes en
+ * PLAY y cada flecha se imprime por consola.
  *   AO2: interrupciones de axi_timer_0/1 y del sensor de temperatura: el DRDY del TMP006
  *        llega a axi_gpio_1 (GIC 64) y se imprime la temperatura al llegar a
- *        TEMP_ALERT_C (26 °C, hw.h). Además, el acelerómetro se lee en la ISR de timer1
+ *        TEMP_ALERT_C (29 °C, hw.h). Además, el acelerómetro se lee en la ISR de timer1
  *        ("Movimiento detectado") y el OPT3001 se revisa cada 200 ms ("Mucha luz").
  *   AO3: IP propio debouncer_axi (botones + LEDs del modo claro), configurado por UART
  *        con debouncer_init(Debouncer *, const DebCfg *).
@@ -20,8 +22,11 @@
  */
 #include "xparameters.h"
 #include "xil_printf.h"
+#include "xgpio.h"
 #include "hw.h"
 #include "lib/platform.h"
+#include "lib/LCD_Driver.h"
+#include "lib/LCD_GUI.h"
 #include "lib/ADC.h"
 #include "lib/I2C.h"
 
@@ -49,9 +54,21 @@ static void init_all(GameCtx *c)
     xil_printf("\r\n=== SEP HERO :: AVANCE === %s %s  (mudo=%d)\r\n", __DATE__, __TIME__, audio_is_muted());
     report("buzzer TTC0", r);
 
-    /* ADC SPI: acelerómetro (calibración en reposo). */
+    /* LCD: GPIO de RS/RST + SPI + secuencia del ST7735S (driver del curso). Queda en negro;
+     * solo se usa para la flecha del nivel Demo. */
+    r = (XGpio_Initialize(&gpio0, XPAR_AXI_GPIO_0_DEVICE_ID) == XST_SUCCESS) ? 0 : -1;
+    if (r == 0) r = (XSpi_Init(&SpiInstance, SPI_DEVICE_ID) == XST_SUCCESS) ? 0 : -2;
+    if (r == 0) {
+        LCD_Init(SCAN_DIR_DFT);
+        lcd_fast_init();
+        lcd_fill(0, 0, LCD_W, LCD_H, 0x0000);
+    }
+    report("LCD", r);
+
+    /* ADC SPI: joystick (centro) y acelerómetro (calibración en reposo). */
     r = (init_adc(&SpiInstance1, SPI_DEVICE_ID_1) == XST_SUCCESS) ? 0 : -1;
     report("ADC SPI", r);
+    report("joystick (centro)", input_init());
     report("acelerometro", sensors_acc_init());
 
     /* I2C + sensores de luz y temperatura. Sin sensor de luz el tema queda fijo en
@@ -123,12 +140,13 @@ int main(void)
         btn_task();                              /* aviso de los botones (irq_deb)    */
         audio_user_mute_task();                  /* JOY_SEL: música ON / OFF          */
         console_poll(&ctx);                      /* teclado del PC                    */
-        if (g_frame_flag) {                      /* cada 30 ms (axi_timer_1)          */
+        if (frame_flag) {                        /* cada 30 ms (axi_timer_1)          */
             UiEvent ev;
-            g_frame_flag = 0;
+            frame_flag = 0;
             ev = ui_pop();
             if (ev == UI_NONE) ev = console_pop_event();
             fsm_step(&ctx, ev);
+            render_frame(&ctx);                  /* LCD: flecha del Demo           */
             console_frame(&ctx);
         }
     }

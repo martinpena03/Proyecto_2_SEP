@@ -20,7 +20,7 @@
  * se trae con un cable desde la BoosterPack (J2.11) a un pin del Pmod JA, que está libre.
  * axi_gpio_1 tiene los 8 pines de JA como candidatos (puerto SENS_INT) y
  * tmp006_detect_drdy() busca en el arranque el bit que baja al convertir y sube al leer. Después, cada
- * conversión interrumpe por irq_gpio (GIC 64): gpio_isr() solo levanta tmp_pending y
+ * conversión interrumpe por irq_gpio (GIC 64): gpio_isr() solo levanta tmp_drdy y
  * temp_task(), desde main, lee la temperatura por I2C (el I2C nunca se usa en una ISR).
  * Si ningún candidato sigue a DRDY no hay interrupción de temperatura y se avisa por UART.
  *
@@ -148,7 +148,7 @@ u8 tmp006_detect_drdy(u8 skip_bit)
     return bit;
 }
 
-/* Desde main, en cada vuelta. Atiende la interrupción del DRDY (tmp_pending, que levanta
+/* Desde main, en cada vuelta. Atiende la interrupción del DRDY (tmp_drdy, que levanta
  * gpio_isr). Si el pin quedó en 0 sin que se viera el flanco (por ejemplo, una conversión
  * que terminó antes de habilitar el GIC), también lo atiende, porque el pin no vuelve a
  * subir hasta que se lee el resultado. */
@@ -157,8 +157,8 @@ void temp_task(void)
     s32 t, lim;
 
     if (!g_tmp_ok || g_tmp_bit == SENS_BIT_NONE) return;
-    if (!tmp_pending && ((gpio1_read() >> g_tmp_bit) & 1u) != 0u) return;
-    tmp_pending = 0;
+    if (!tmp_drdy && ((gpio1_read() >> g_tmp_bit) & 1u) != 0u) return;
+    tmp_drdy = 0;
 
     t   = tmp006_read_cc();
     lim = (s32)TEMP_ALERT_C * 100;
