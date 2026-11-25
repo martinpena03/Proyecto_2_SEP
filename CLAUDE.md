@@ -55,7 +55,8 @@ cambios entre ramas sin que el usuario lo pida.
    actualiza esa tabla. `SepHero_BD.pdf` y `Diagrama_de_bloques_02.pdf` son versiones viejas.
 4. **Portabilidad.** `game_manager.c`, `state_machine.c`, `sound_manager.c`,
    `sd_manager_formats.c`, `sd_manager_songs.c`, `debouncer_ip_logic.c`, `uart_config.c`,
-   `joystick_aconditioner_logic.c`, `screen_manager.c` y `screen_manager_text.c` **no incluyen
+   `joystick_aconditioner_logic.c`, `screen_manager.c`, `screen_manager_text.c` y
+   `screen_manager_arrows.c` **no incluyen
    headers de Xilinx** ni usan `printf`. Solo llaman funciones de `interfaces.h`. Se compilan en
    el PC con los stubs de `tests/stubs.c`.
 5. **Las ISR no usan la UART ni el I²C.** Leen o escriben registros rápidos y dejan banderas
@@ -99,8 +100,9 @@ cada 30 ms (`frame_flag`), un paso de la FSM (`fsm_step(ctx, ev)` con un evento 
 `ui_pop()` o de la consola), `render_frame()` y `console_frame()`.
 
 Máquina de estados (`FsmState` en `interfaces.h`): `ST_INIT → ST_MENU → (ST_LEVEL → ST_PLAY ⇄
-ST_PAUSE → ST_GAMEOVER) | ST_RECORDS | ST_CONFIG`. En el avance PLAY dura `AVANCE_PLAY_MS`
-(20 s) con cuenta regresiva `[Jugando] quedan N s`. Todo el estado vive en `GameCtx`
+ST_PAUSE → ST_GAMEOVER) | ST_RECORDS | ST_CONFIG`. En PLAY suena la melodía de la canción;
+la partida termina al acabar la canción (victoria) o con el rock meter en 0 (derrota).
+Durante los primeros `AVANCE_PLAY_MS` (20 s) la consola imprime `[Jugando] quedan N s`. Todo el estado vive en `GameCtx`
 (`state_machine.h`, unos 7 KB, `static` en `main`) y se pasa por puntero.
 
 IP `debouncer_axi` (AXI4-Lite, base `XPAR_DEBOUNCER_IP_BASEADDR`):
@@ -142,8 +144,8 @@ IP `debouncer_axi` (AXI4-Lite, base `XPAR_DEBOUNCER_IP_BASEADDR`):
 | `hw/vivado/` | proyecto Vivado generado (ignorado por git) |
 | `sw/src/` | código C de la aplicación (detalle abajo) |
 | `sw/lscript.ld` | linker script (stack y heap de 64 KB) |
-| `sw/scripts/vitis_platform.tcl` | crea el workspace `sw/workspace` (plataforma + app `sep_hero` con `sw/src` enlazada) |
-| `sw/scripts/build_app.sh` | compila con el `arm-none-eabi-gcc` de Vitis: `debug` (mudo), `sound`, `release`; deja el ELF en `sw/workspace/sep_hero/cli_<cfg>/` |
+| `sw/scripts/vitis_platform.tcl` | crea el workspace `sw/workspace` (plataforma con xilffs + app `sep_hero` con `sw/src` enlazada) |
+| `sw/scripts/build_app.sh` | compila con el `arm-none-eabi-gcc` de Vitis: `debug` (mudo), `sound`, `release`; deja el ELF en `<WS>/<APP>/cli_<cfg>/` (por defecto `sw/workspace/sep_hero`; `WS`, `PLAT` y `APP` apuntan a otro workspace) |
 | `sw/scripts/run_on_board.tcl` | programa la FPGA y corre el ELF por JTAG (revisa JP5 antes) |
 | `sw/scripts/make_boot.sh` | genera `boot/BOOT.bin` (FSBL + bit + ELF Release) y opcionalmente lo graba en la QSPI |
 | `sw/scripts/uart_session.ps1` | registra la UART y envía teclas programadas a la consola |
@@ -165,19 +167,20 @@ IP `debouncer_axi` (AXI4-Lite, base `XPAR_DEBOUNCER_IP_BASEADDR`):
 | `hw.h` | prototipos solo de placa (ISR, sensores, LCD, consola) y opciones de compilación: `SEP_MUTE`, `JOY_INVERT_Y`, `MUSIC_START_MUTED`, `TEMP_ALERT_C` |
 | `isr_handler.c` (ISR_handler) | GIC, `axi_timer_0/1`, relojes `clock_sys_ms()` / `clock_song_ms()`, `deb_isr()`, `gpio_isr()`, `frame_flag`, `tmp_drdy` |
 | `event_queues.c` | colas SPSC ISR → main: golpes (`Hit_signal`) y eventos de interfaz (`UiEvent`) |
-| `joystick_aconditioner.c` (Joystick_aconditioner) | calibra el centro y en PLAY encola golpes con sello de tiempo corregido |
+| `joystick_aconditioner.c` (Joystick_aconditioner) | calibra el centro; en PLAY encola golpes con sello de tiempo corregido y en los menús envía `UI_UP`/`UI_DOWN` |
 | `joystick_aconditioner_logic.c` | detector portable de dirección con eje dominante e histéresis (`joy_detect()`) |
 | `accelerometer_aconditioner.c` (Accelerometer_aconditioner) | calibración, detección de sacudida → `UI_POWER_UP_ENABLE` |
 | `light_aconditioner.c` (Light_aconditioner) | OPT3001: comparador de ventana, `light_level` (lux), `light_mode_current()` |
 | `temperature_aconditioner.c` (Temperature_aconditioner) | TMP006 por I²C, búsqueda del pin DRDY, aviso al llegar a `TEMP_ALERT_C` |
 | `state_machine.c/.h` (State_Machine) | FSM, `GameCtx`, `game_on_off()`, textos de cada estado por consola, `fsm_apply_cfg()` |
 | `game_manager.c` (Game Manager) | juzga golpes (`HIT_WIN_MS`), puntaje, racha, star power, rock meter, fin de partida |
-| `sd_manager.c` (SD_Manager) | en el avance: carga los charts embebidos y guarda los récords en RAM |
+| `sd_manager.c` (SD_Manager) | FatFs sobre SDIO0: carga `SONGn.SHC` y lee/escribe `RECORDS.TXT`; sin tarjeta usa los charts embebidos y deja los récords en RAM |
 | `sd_manager_formats.c` | parsers portables de `.SHC` y `RECORDS.TXT`, inserción en el top 5 |
 | `sd_manager_songs.c` | charts embebidos (generado por `tools/shc2c.py`; no editar a mano) |
 | `sound_manager.c` (Sound Manager) | secuenciador del buzzer: canción, jingles y efectos; `buzzer_tick()` cada 1 ms |
 | `ttc0_pwm.c` (TTC0 (PWM)) | `buzzer_tone(bz, freq, duty)`, mudo de seguridad y `song_enabler` (JOY_SEL) |
-| `screen_manager.c` (Screen Manager) | en el avance: nombre de la flecha del nivel Demo en el LCD durante `DEMO_KEY_MS` |
+| `screen_manager.c` (Screen Manager) | logo, menú y pista de 4 carriles con flechas que caen, receptores, HUD y paleta clara/oscura; repinta solo lo que cambió |
+| `screen_manager_arrows.c/.h` | sprites de las flechas (generados por `tools/gen_arrows.py`; están en ISO-8859-1) |
 | `screen_manager_text.c/.h` | texto sobre el framebuffer con las fuentes del curso |
 | `screen_manager_lcd.c` | envío rápido de rectángulos y bitmaps al ST7735S |
 | `debouncer_ip.c` | driver del IP: `debouncer_init(Debouncer*, const DebCfg*)`, flancos, LEDs, relectura |
@@ -198,6 +201,8 @@ gmake -C tests run                      # debe terminar en TESTS_OK
 xsct sw/scripts/vitis_platform.tcl
 sh sw/scripts/build_app.sh debug        # buzzer en mudo: lo único que se carga sin el usuario
 sh sw/scripts/build_app.sh sound        # con sonido, solo con autorización
+# Contra el workspace de la GUI (app Avance_P2, plataforma AvanceP2):
+WS=/c/Users/pdelc/workspace PLAT=AvanceP2 APP=Avance_P2 sh sw/scripts/build_app.sh debug
 xsct sw/scripts/run_on_board.tcl Debug  # JTAG; JP5 en JTAG
 
 # Hardware (solo si cambia el block design; ≤ 2 núcleos)
@@ -219,7 +224,6 @@ Consola UART (115200 8N1): `1` OK, `2` atrás, `u`/`j` cursor, `k` star power, `
 - El INT del OPT3001 no llega a la Zybo: el sensor de luz se revisa cada 200 ms.
 - El DRDY del TMP006 llega por un cable desde J2.11 de la BoosterPack a JA1. Si el arranque
   imprime `ninguno` en la búsqueda del DRDY, falta el cable.
-- En el avance los niveles no tienen música (`Musica de juego pendiente`) y los menús se
-  manejan por consola.
+- Los menús se manejan por consola y con el joystick (arriba/abajo mueve el cursor).
 - Las pruebas físicas (LCD, joystick, botones, sacudida, buzzer) las hace el usuario con la
   placa. Tú verificas por UART, releyendo registros y con los tests.

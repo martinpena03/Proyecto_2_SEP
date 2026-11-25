@@ -73,7 +73,7 @@ static void load_selected_song(GameCtx *ctx)
         p = fmt_str(p, ctx->song.name);
         p = fmt_str(p, " (");
         p = fmt_u32(p, ctx->song.n);
-        p = fmt_str(p, " notas). Musica de juego pendiente\r\n");
+        p = fmt_str(p, " notas)\r\n");
     } else {
         p = fmt_str(p, ": error de carga\r\n");
     }
@@ -221,7 +221,7 @@ static void start_game(GameCtx *ctx)
     ctx->count_shown = 0;
     clock_song_set(0);
     game_on_off(1);
-    buzzer_stop(&ctx->bz);                      /* avance: el nivel no tiene música */
+    buzzer_play(&ctx->bz, &ctx->song);          /* la melodía sigue el reloj de canción */
     enter_state(ctx, ST_PLAY);
     uart_hal_puts("Juego iniciado\r\n");
 }
@@ -233,8 +233,6 @@ static void resume_game(GameCtx *ctx)
     game_on_off(1);
     enter_state(ctx, ST_PLAY);
 }
-
-
 
 /* Arranque: monta la SD (o activa el respaldo), carga los récords y muestra el logo. */
 void fsm_start(GameCtx *ctx)
@@ -329,8 +327,9 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         now = clock_song_ms();
         game_update(&ctx->game_status, &ctx->song, now);                              /* 2.o el tiempo  */
 
-        /* por ahora la partida dura AVANCE_PLAY_MS en cada segundo se imprime cuanto falta y no hay sonido en el nivel. */
-        /* El Demo no tiene cuenta de 20 s: termina 2 s después de su última flecha. */
+        /* Cuenta regresiva por consola durante los primeros AVANCE_PLAY_MS (referencia del
+         * avance); la partida termina al acabar la canción o con el rock meter en 0.
+         * El Demo no la imprime: termina 2 s después de su última flecha. */
         if (!demo && now < AVANCE_PLAY_MS) {
             u8 left = (u8)((AVANCE_PLAY_MS - now + 999u) / 1000u);
             if (left != ctx->count_shown) {
@@ -347,12 +346,11 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
         }
 
 
-        if (demo) {
-            game_over_signal = (now > song_duration_ms(&ctx->song))
-                             ? ((ctx->game_status.rock > 0) ? RESULT_WIN : RESULT_LOSE) : RESULT_NONE;
+        if (ctx->game_status.rock <= 0) {                 /* rock meter vacío: pierdes  */
+            game_over_signal = RESULT_LOSE;
+            uart_hal_puts("   [PLAY] rock meter en 0: fin de la partida\r\n");
         } else {
-            game_over_signal = (now >= AVANCE_PLAY_MS)
-                             ? ((ctx->game_status.rock > 0) ? RESULT_WIN : RESULT_LOSE) : RESULT_NONE;
+            game_over_signal = (now > song_duration_ms(&ctx->song)) ? RESULT_WIN : RESULT_NONE;
             if (game_over_signal != RESULT_NONE) uart_hal_puts("   [PLAY] tiempo cumplido: fin de la partida\r\n");
         }
         if (game_over_signal != RESULT_NONE) {
@@ -379,7 +377,7 @@ void fsm_step(GameCtx *ctx, UiEvent ev)
 
     /* GAMEOVER */
     case ST_GAMEOVER:
-        /* Bonus un gritosube puntaje por 5seg*/
+        /* Bonus un grito sube puntaje por 5seg*/
         if (!ctx->game_status.encore_done && ctx->rec_pos < 0 && (now_sys - ctx->t_state) <= ENCORE_WIN_MS) {
             if (ctx->game_status.crowd_noise >= ENCORE_LEVEL) {
                 if (++ctx->encore_cnt >= ENCORE_FRAMES) {

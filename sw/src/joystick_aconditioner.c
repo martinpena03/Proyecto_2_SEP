@@ -50,12 +50,15 @@ void joy_sample(void)
 
     adc_read_chain(ch, 2, v);
     d = joy_detect(&g_joy, v[0], v[1]);
-    if (d < 0 || !g_play_mode) return;
-    if (clock_sys_ms() < g_mute_until) return;       /* recién hubo una sacudida */
-    /* El detector decide JOY_SETTLE_N muestras después de cruzar el umbral: el sello de
-     * tiempo se corrige para que marque el instante del cruce. */
-    {
+    if (d < 0) return;
+
+    if (g_play_mode) {                               /* JUEGO: golpe con sello de tiempo */
+        if (clock_sys_ms() < g_mute_until) return;   /* recién hubo una sacudida */
         u32 t = clock_song_ms(), lat = JOY_SETTLE_N * JOY_TICK_MS;
         hit_push_joy((u8)d, (t > lat) ? (t - lat) : 0u);
+    } else if (d == ARRIBA) {                        /* MENÚS: mover el cursor */
+        ui_push(UI_UP);
+    } else if (d == ABAJO) {
+        ui_push(UI_DOWN);
     }
 }

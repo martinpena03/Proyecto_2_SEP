@@ -10,7 +10,8 @@ CFLAGS  := -std=c99 -Wall -Wextra -g -I../sw/src -I../sw/src/lib
 SRC     := ../sw/src
 PORTABLE := game_manager.c state_machine.c sound_manager.c sd_manager_formats.c \
             sd_manager_songs.c debouncer_ip_logic.c uart_config.c \
-            joystick_aconditioner_logic.c screen_manager.c screen_manager_text.c
+            joystick_aconditioner_logic.c screen_manager.c screen_manager_text.c \
+            screen_manager_arrows.c
 FONTS   := $(addprefix $(SRC)/lib/,font8.c font12.c font16.c font20.c font24.c)
 COMMON  := $(addprefix $(SRC)/,$(PORTABLE)) $(FONTS) stubs.c
 BUILD   := build

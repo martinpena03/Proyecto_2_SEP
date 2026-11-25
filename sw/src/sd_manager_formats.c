@@ -32,7 +32,7 @@ static int is_eol(char c)   { return c == '\n' || c == '\r'; }
  * Devuelve 0 si leyó al menos un dígito. */
 static int read_u32(const char **pp, const char *end, u32 *out)
 {
-    const char *p = *pp;
+    const char *p = *pp; /* copia local del puntero de lectura */
     u32 v = 0;
     int n = 0;
     while (p < end && is_space(*p)) p++;
@@ -41,7 +41,7 @@ static int read_u32(const char **pp, const char *end, u32 *out)
         p++;
         if (++n > 9) return -1;          /* más de 9 dígitos: desborde */
     }
-    *pp = p;
+    *pp = p; /* devuelve al llamador la posición tras el último dígito */
     *out = v;
     return (n > 0) ? 0 : -1;
 }
@@ -60,7 +60,7 @@ static int starts_with(const char *p, const char *end, const char *key)
  * Devuelve la cantidad de notas (> 0) o un código SONG_ERR_* (< 0). */
 int song_parse(const char *buf, u32 len, Song *song, Note *pool, u16 max)
 {
-    const char *p = buf;
+    const char *p = buf; /* cursor de lectura sobre buf */
     const char *end = buf + len;
     u16 n = 0;
     u32 last_t = 0;

@@ -126,7 +126,7 @@ int main(void)
 {
     init_all(&ctx);
     xil_printf("\r\n--- AVANCE: AO2 (timers + interrupcion del TMP006), AO3 (Debouncer_IP + LEDs del modo claro),\r\n"
-               "    AC1 (maquina de estados por consola), AC6 (melodia del menu) ---\r\n"
+               "    AC1 (maquina de estados por consola) ---\r\n"
                "    Temperatura: DRDY en %s, aviso al llegar a %d C. Luz: oscuro < %d lux, claro > %d lux.\r\n"
                "    Botones: S1 = OK, S2 = atras, JOY_SEL = musica ON/OFF (parte en OFF). 'h' = ayuda.\r\n"
                "    Los niveles no tienen musica: PLAY dura 20 s con cuenta regresiva por consola.\r\n",

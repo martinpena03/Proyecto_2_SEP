@@ -24,6 +24,21 @@ static void boot(void)
     fsm_start(&ctx);
 }
 
+/* Píxeles de color c en el rectángulo [x0, x1) x [y0, y1) del LCD simulado. */
+static u32 px_in(u16 x0, u16 y0, u16 x1, u16 y1, u16 c)
+{
+    u32 n = 0;
+    u16 x, y;
+    for (y = y0; y < y1; y++)
+        for (x = x0; x < x1; x++)
+            if (stub_lcd_fb[y][x] == c) n++;
+    return n;
+}
+
+/* Geometría de la pista (igual que screen_manager.c): carril 'l' en x = 19 + 24 l, 18 px. */
+#define LANE_PX(l)  (u16)(19u + 24u * (l))
+#define RCV_Y_PX    98u
+
 /* Juega la canción completa con golpes perfectos (opcionalmente hasta 'until' ms). */
 static void autoplay(u32 until)
 {
@@ -83,7 +98,7 @@ void test_fsm(void)
     /* PLAY: modo juego del joystick, reloj de canción corriendo. */
     frame(UI_OK);
     CHECK(ctx.state == ST_PLAY && stub_play_mode == 1 && stub_song_running && ctx.game_status.rock == ROCK_START);
-    CHECK(!ctx.bz.playing && strstr(stub_uart_out, "Juego iniciado\r\n") != NULL);
+    CHECK(ctx.bz.playing && strstr(stub_uart_out, "Juego iniciado\r\n") != NULL);   /* suena la canción */
     frame(UI_NONE);
     CHECK(strstr(stub_uart_out, "[Jugando] quedan 20 s") != NULL);
     CHECK(strstr(stub_uart_out, "[Jugando] quedan 19 s") == NULL);
@@ -118,10 +133,10 @@ void test_fsm(void)
     frame(UI_BACK);  frame(UI_DOWN);  frame(UI_OK);
     CHECK(ctx.state == ST_PLAY && stub_song_ms < 100 && ctx.game_status.score == 0 && ctx.game_status.hits == 0);
 
-    /* Partida perfecta: termina por tiempo a los 20 s => VICTORIA y entra al top 5. */
+    /* Partida perfecta: termina al acabar la canción => VICTORIA y entra al top 5. */
     autoplay(0xFFFFFFFFu);
     CHECK(ctx.state == ST_GAMEOVER && ctx.result == RESULT_WIN && !stub_song_running);
-    CHECK(stub_song_ms >= AVANCE_PLAY_MS && stub_song_ms < AVANCE_PLAY_MS + 60u);
+    CHECK(stub_song_ms > song_duration_ms(&ctx.song) && stub_song_ms < song_duration_ms(&ctx.song) + 60u);
     CHECK(ctx.game_status.hits > 20 && ctx.game_status.misses == 0 && ctx.name_entry == 1);
     CHECK(strstr(stub_uart_out, "[Jugando] quedan 1 s") != NULL);
     CHECK(strstr(stub_uart_out, "[Jugando] quedan 0 s") == NULL);
@@ -146,10 +161,11 @@ void test_fsm(void)
     CHECK(strstr(stub_sd_records, "BAZ ") != NULL);
     frame(UI_OK);    CHECK(ctx.state == ST_MENU);
 
-    /* Derrota: sin tocar nada el rock meter llega a 0, pero la partida dura los 20 s. */
+    /* Derrota: sin tocar nada el rock meter llega a 0 y la partida termina en ese momento. */
     frame(UI_OK);  frame(UI_OK);  CHECK(ctx.state == ST_PLAY);
     while (ctx.state == ST_PLAY) frame(UI_NONE);
-    CHECK(stub_song_ms >= AVANCE_PLAY_MS);
+    CHECK(stub_song_ms < song_duration_ms(&ctx.song));
+    CHECK(strstr(stub_uart_out, "rock meter en 0") != NULL);
     CHECK(ctx.state == ST_GAMEOVER && ctx.result == RESULT_LOSE && ctx.game_status.rock == 0 && ctx.name_entry == 0);
     frame(UI_OK);    CHECK(ctx.state == ST_MENU);
 
@@ -163,26 +179,33 @@ void test_fsm(void)
 }
 
 /* Nivel Demo: flechas del joystick por consola (+ puntaje), star power con STAR_STREAK
- * aciertos, fin 2 s después de la última flecha, puntaje final y la flecha en el LCD
- * durante DEMO_KEY_MS centrados en cada nota. */
+ * aciertos, fin 2 s después de la última flecha, puntaje final y la pista en el LCD:
+ * las flechas caen por su carril y desaparecen al acertarlas. */
 void test_demo(void)
 {
     int i;
+    u16 bg, hit;
     boot();
     for (i = 0; i < 50; i++) frame(UI_NONE);
     render_frame(&ctx);
-    CHECK(ctx.state == ST_MENU && stub_lcd_count(0x0000) == (u32)LCD_W * LCD_H);   /* LCD en negro */
+    bg  = (ctx.game_status.light_mode == THEME_LIGHT) ? 0xFFFFu : 0x0000u;
+    hit = (ctx.game_status.light_mode == THEME_LIGHT) ? 0x0480u : 0x07E0u;
+    CHECK(ctx.state == ST_MENU && stub_lcd_count(bg) < (u32)LCD_W * LCD_H);    /* menú dibujado */
     frame(UI_OK);    CHECK(ctx.state == ST_LEVEL && ctx.select_song == LEVEL_DEMO && strcmp(ctx.song.name, "Demo") == 0);
     render_frame(&ctx);
-    CHECK(stub_lcd_count(0xFFFF) == 0);                                        /* sin menú ni texto */
+    CHECK(stub_lcd_count(bg) < (u32)LCD_W * LCD_H);                           /* LEVEL dibujado */
     frame(UI_OK);    CHECK(ctx.state == ST_PLAY && stub_play_mode == 1);
     stub_uart_out[0] = '\0';
 
-    /* LCD: la 1.a flecha (UP, t = 3000 ms) se ve entre 2750 y 3250 ms. */
-    while (stub_song_ms < 2700u) { frame(UI_NONE); render_frame(&ctx); }
-    CHECK(stub_lcd_count(0xFFFF) == 0);
+    /* La 1.a flecha (UP, verde, t = 3000 ms) entra a la pista a los 1500 ms y baja por
+     * el carril 1 hasta el receptor; los otros carriles siguen vacíos. */
+    while (stub_song_ms < 1400u) { frame(UI_NONE); render_frame(&ctx); }
+    CHECK(px_in(LANE_PX(1), 16, LANE_PX(1) + 18u, RCV_Y_PX, 0x07E0u) == 0);
+    while (stub_song_ms < 2000u) { frame(UI_NONE); render_frame(&ctx); }
+    CHECK(px_in(LANE_PX(1), 30, LANE_PX(1) + 18u, 70, 0x07E0u) > 0);          /* y ~ 45 */
+    CHECK(px_in(LANE_PX(2), 16, LANE_PX(2) + 18u, RCV_Y_PX, 0xFFE0u) == 0);   /* ABAJO aún no */
     while (stub_song_ms < 2760u) { frame(UI_NONE); render_frame(&ctx); }
-    CHECK(stub_lcd_count(0xFFFF) > 0);
+    CHECK(px_in(LANE_PX(1), 80, LANE_PX(1) + 18u, 116, 0x07E0u) > 0);         /* sobre el receptor */
 
     /* Flecha sin nota cerca: se imprime sin puntaje. El autoplay no se imprime. */
     stub_push_joy_hit(IZQ, 2790u);
@@ -190,11 +213,11 @@ void test_demo(void)
     frame(UI_NONE);  render_frame(&ctx);
     CHECK(strstr(stub_uart_out, "[JOY] LEFT  t=2790 ms\r\n") != NULL);
     CHECK(strstr(stub_uart_out, "[JOY] UP") == NULL && ctx.game_status.hits == 1);
-    CHECK(stub_lcd_count(0xFFFF) > 0);                                         /* el acierto no la borra */
-    while (stub_song_ms < 3240u) { frame(UI_NONE); render_frame(&ctx); }
-    CHECK(stub_lcd_count(0xFFFF) > 0);
-    while (stub_song_ms < 3300u) { frame(UI_NONE); render_frame(&ctx); }
-    CHECK(stub_lcd_count(0xFFFF) == 0);                                        /* 500 ms y se borra */
+    /* Acertada: la flecha desaparece y el receptor destella con el color de acierto. */
+    CHECK(px_in(LANE_PX(1), 16, LANE_PX(1) + 18u, 116, 0x07E0u) == px_in(LANE_PX(1), RCV_Y_PX, LANE_PX(1) + 18u, 116, 0x07E0u));
+    CHECK(px_in(LANE_PX(1), RCV_Y_PX, LANE_PX(1) + 18u, 116, hit) > 0);
+    for (i = 0; i < 6; i++) { frame(UI_NONE); render_frame(&ctx); }
+    CHECK(px_in(LANE_PX(1), RCV_Y_PX, LANE_PX(1) + 18u, 116, hit) == 0);     /* el destello termina */
 
     /* Golpes del joystick sobre las notas 2..5: ACIERTO +100; con 5 aciertos, barra llena. */
     for (i = 1; i < 5; i++) {
@@ -218,5 +241,5 @@ void test_demo(void)
     CHECK(ctx.result == RESULT_WIN && stub_song_ms > 14300u && stub_song_ms < 14400u);
     CHECK(strstr(stub_uart_out, "[GAMEOVER] puntaje final: 1500\r\n") != NULL);
     render_frame(&ctx);
-    CHECK(stub_lcd_count(0xFFFF) == 0);
+    CHECK(stub_lcd_count(bg) < (u32)LCD_W * LCD_H);                           /* GAMEOVER dibujado */
 }
